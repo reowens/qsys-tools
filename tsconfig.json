@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noEmit": true
+  },
+  "include": ["packages/*/src/**/*", "packages/*/test/**/*"],
+  "exclude": [
+    "packages/qsys/test/cli.ts",
+    "packages/qsys-mcp/test/mock-qrc.ts",
+    "packages/qsys-mcp/test/integration.ts",
+    "packages/qsys-mcp/test/mcp-mock.ts",
+    "packages/qsys-mcp/test/reconnect.ts"
+  ]
+}

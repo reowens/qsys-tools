@@ -1,0 +1,53 @@
+{
+  "name": "qsys-cli",
+  "version": "0.1.0",
+  "description": "Human/scriptable CLI to control a Q-SYS Core over QRC — status, component inventory, get/set controls, watch, snapshots.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "qsys": "dist/bin.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "postbuild": "node -e \"require('fs').chmodSync('dist/bin.js', 0o755)\"",
+    "prepare": "npm run build",
+    "qsys": "tsx src/bin.ts --",
+    "test": "node ../../scripts/run-if-emulator.mjs \"tsx test/cli.ts\""
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/reowens/qsys-tools.git",
+    "directory": "packages/qsys"
+  },
+  "bugs": {
+    "url": "https://github.com/reowens/qsys-tools/issues"
+  },
+  "homepage": "https://github.com/reowens/qsys-tools/tree/main/packages/qsys#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "keywords": [
+    "q-sys",
+    "qsys",
+    "qsc",
+    "qrc",
+    "cli",
+    "av"
+  ],
+  "dependencies": {
+    "qsys-qrc": "^0.1.0"
+  }
+}

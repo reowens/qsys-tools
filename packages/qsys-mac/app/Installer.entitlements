@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- The installer needs NO special entitlements: it only spawns wine as a CHILD process (which
+       carries its own signature/entitlements) and otherwise loads Apple-signed frameworks. So it
+       does NOT carry the launcher's JIT / unsigned-executable-memory / disable-library-validation
+       set — an empty entitlements dict under hardened runtime is the most restrictive, smallest
+       attack surface for the notarized installer (A6). The launcher/Wine app keeps those in
+       QSYSDesigner.entitlements. -->
+</dict>
+</plist>

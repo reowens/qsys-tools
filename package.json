@@ -1,0 +1,20 @@
+{
+  "name": "qsys-tools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Monorepo for the qsys family: qsys-qrc (QRC client core) + qsys-cli (control CLI) + qsys-mcp (MCP server).",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:full": "tsc -p tsconfig.e2e.json --noEmit",
+    "test": "npm run --workspaces --if-present test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

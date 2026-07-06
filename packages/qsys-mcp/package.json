@@ -1,0 +1,69 @@
+{
+  "name": "qsys-mcp",
+  "version": "0.3.0",
+  "description": "Control a Q-SYS audio/video system from an AI agent over QSC's QRC protocol — against a real Core or Q-SYS Designer in Emulate mode. Open-source, cross-platform, zero QSC code.",
+  "type": "module",
+  "bin": {
+    "qsys-mcp": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "postbuild": "node -e \"require('fs').chmodSync('dist/index.js', 0o755)\"",
+    "prepare": "npm run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "node ../../scripts/run-if-emulator.mjs \"tsx test/integration.ts && tsx test/mcp-mock.ts && tsx test/reconnect.ts\"",
+    "test:mcp": "tsx test/mcp-mock.ts",
+    "test:reconnect": "tsx test/reconnect.ts",
+    "smoke": "tsx test/live-smoke.ts",
+    "smoke:write": "tsx test/live-write.ts",
+    "smoke:mcp": "tsx test/mcp-smoke.ts",
+    "smoke:named": "tsx test/live-named.ts",
+    "smoke:keepalive": "tsx test/keepalive.ts"
+  },
+  "keywords": [
+    "q-sys",
+    "qsys",
+    "qsc",
+    "mcp",
+    "model-context-protocol",
+    "qrc",
+    "av",
+    "audiovisual",
+    "audio",
+    "dsp",
+    "ai-agent",
+    "claude-code",
+    "typescript"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/reowens/qsys-tools.git",
+    "directory": "packages/qsys-mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/reowens/qsys-tools/issues"
+  },
+  "homepage": "https://github.com/reowens/qsys-tools/tree/main/packages/qsys-mcp#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.18.0",
+    "qsys-qrc": "^0.1.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

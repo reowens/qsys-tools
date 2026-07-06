@@ -1,0 +1,37 @@
+{
+  "name": "qsys-qrc",
+  "version": "0.1.0",
+  "description": "Q-SYS Remote Control (QRC) client, null-terminated JSON-RPC wire framing, and shared types — the core the qsys CLI and q-sys-mcp server both build on.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/reowens/qsys-tools.git",
+    "directory": "packages/qsys-qrc"
+  },
+  "bugs": {
+    "url": "https://github.com/reowens/qsys-tools/issues"
+  },
+  "homepage": "https://github.com/reowens/qsys-tools/tree/main/packages/qsys-qrc#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "keywords": ["q-sys", "qsys", "qsc", "qrc", "av"]
+}

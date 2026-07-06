@@ -1,0 +1,7 @@
+# xcodegen regenerates this from project.yml — don't commit it.
+*.xcodeproj/
+# build output
+build/
+DerivedData/
+# any locally-harvested test artifacts (BYO icon/wine/prefix never belong in git)
+Resources/
