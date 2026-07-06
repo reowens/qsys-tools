@@ -6,6 +6,8 @@
 [![node](https://img.shields.io/badge/node-%E2%89%A518-brightgreen.svg)](https://nodejs.org)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+MCP Registry name: **`io.github.reowens/qsys-mcp`**
+
 `qsys-mcp` is an [MCP](https://modelcontextprotocol.io) server. It speaks QSC's **QRC** external-control protocol (JSON-RPC 2.0 over TCP) — the same interface third-party control systems like Crestron and AMX use — and exposes it to an LLM agent as a set of tools. Point it at a physical Q-SYS Core *or* at Q-SYS Designer running in **Emulate mode** and the agent can read meters, flip mutes, ramp gains, and watch controls for changes.
 
 It's a pure wire-protocol client: **zero QSC code**, no SDK, no hardware required for development. That makes it a clean, sanctioned layer QSC ships on no platform — AI-native control — and it runs anywhere Node does.
@@ -26,6 +28,9 @@ Run it straight from npm (no install):
 ```bash
 npx -y qsys-mcp       # MCP server on stdio
 ```
+
+Registry-aware clients can also discover it in the MCP Registry as
+`io.github.reowens/qsys-mcp`.
 
 > Formerly published as `q-sys-mcp` (now unpublished) — as of 0.3.0 the package
 > name matches the command: **`qsys-mcp`**. Update any existing MCP configs.

@@ -18,7 +18,7 @@ code, no SDK, no hardware required for development.**
 |---|---|
 | [`qsys-cli`](packages/qsys) | CLI (command: `qsys`) — status, component inventory, get/set controls with ramps, live watch, snapshots |
 | [`qsys-qrc`](packages/qsys-qrc) | TypeScript QRC client — wire framing, change groups, keepalive, transparent auto-reconnect, typed protocol surface |
-| [`qsys-mcp`](packages/qsys-mcp) | [MCP](https://modelcontextprotocol.io) server — 18 tools that let an AI agent (Claude, etc.) inspect and drive a live Q-SYS system |
+| [`qsys-mcp`](packages/qsys-mcp) | [MCP](https://modelcontextprotocol.io) server (`io.github.reowens/qsys-mcp` in the MCP Registry) — 18 tools that let an AI agent inspect and drive a live Q-SYS system |
 | [`qsys-mac`](packages/qsys-mac) | **Q-SYS Designer for macOS** — notarized BYO-installer wrapper (native app; GPL-3.0, not an npm package) |
 
 ## Quick start — shell
@@ -68,6 +68,8 @@ Then ask the agent to connect to your Core (or the Designer emulator) and it can
 meters, flip mutes, ramp gains, watch controls for changes, and recall snapshots —
 with auto-reconnect across Core restarts. Details in
 [`packages/qsys-mcp`](packages/qsys-mcp).
+
+Registry-aware MCP clients can discover it as `io.github.reowens/qsys-mcp`.
 
 ## Quick start — your own code
 
