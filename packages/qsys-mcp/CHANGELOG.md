@@ -6,6 +6,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-06
+
 ### Fixed
 
 - `serverInfo.version` now reflects the package version (was hardcoded `0.1.0`
@@ -72,6 +74,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   hardware-free test suite (mock QRC + in-memory MCP transport).
 
 [Unreleased]: https://github.com/reowens/qsys-tools/tree/main/packages/qsys-mcp
+[0.3.1]: https://www.npmjs.com/package/qsys-mcp/v/0.3.1
 [0.3.0]: https://www.npmjs.com/package/qsys-mcp/v/0.3.0
 [0.2.0]: https://github.com/reowens/qsys-mcp/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/reowens/qsys-mcp/releases/tag/v0.1.1

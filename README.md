@@ -99,10 +99,8 @@ covered by typed helpers — see [`packages/qsys-qrc`](packages/qsys-qrc).
 QSC's Windows-only Q-SYS Designer on Apple-Silicon Macs — no VM, no CrossOver. You
 drop in **your own** free Designer installer download (BYO — nothing of QSC's is
 redistributed); it provisions Wine + .NET into Application Support and gives you a
-real Dock/Finder/menu-bar citizen. DMG builds are published from
-[Releases](https://github.com/reowens/qsys-tools/releases); until the first public
-DMG is attached there, see [`packages/qsys-mac`](packages/qsys-mac) to build/package
-locally.
+real Dock/Finder/menu-bar citizen. Grab the notarized DMG from
+[Releases](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-v0.1.0).
 
 Bonus: Designer's **Emulate mode** serves QRC on `127.0.0.1:1710`, so all of the
 tools above work hardware-free against it — that's how this repo's tooling is
