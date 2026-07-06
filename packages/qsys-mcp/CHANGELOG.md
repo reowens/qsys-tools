@@ -6,6 +6,12 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-07-06
+
+### Fixed
+
+- Add the npm `mcpName` field required for MCP Registry validation.
+
 ## [0.3.1] - 2026-07-06
 
 ### Fixed
@@ -74,6 +80,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   hardware-free test suite (mock QRC + in-memory MCP transport).
 
 [Unreleased]: https://github.com/reowens/qsys-tools/tree/main/packages/qsys-mcp
+[0.3.2]: https://www.npmjs.com/package/qsys-mcp/v/0.3.2
 [0.3.1]: https://www.npmjs.com/package/qsys-mcp/v/0.3.1
 [0.3.0]: https://www.npmjs.com/package/qsys-mcp/v/0.3.0
 [0.2.0]: https://github.com/reowens/qsys-mcp/compare/v0.1.1...v0.2.0
