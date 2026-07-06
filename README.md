@@ -138,6 +138,8 @@ npm run typecheck:full  # includes the emulator-backed test files
 [`packages/qsys-mac`](packages/qsys-mac) (`scripts/package.sh` for the
 sign/notarize pipeline).
 
+Maintainer release steps are documented in [`RELEASE.md`](RELEASE.md).
+
 ## Licensing
 
 - npm packages (`qsys-cli`, `qsys-qrc`, `qsys-mcp`): **MIT**
