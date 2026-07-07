@@ -63,6 +63,7 @@ const usage = `qsys-mac ${CLI_VERSION}
 Usage:
   qsys-mac install <Q-SYS Designer Installer*.exe> [--dmg <path>]
   qsys-mac status [--dmg <path>]
+  qsys-mac doctor [--dmg <path>]
   qsys-mac remove [--dmg <path>]
 
 This npm package is a bootstrapper. It downloads and verifies the signed
@@ -156,6 +157,9 @@ export async function runBootstrapper(
   } else if (command === 'status') {
     if (parsed.positionals.length !== 0) throw new UsageError('usage: qsys-mac status');
     helperArgs.push('status');
+  } else if (command === 'doctor') {
+    if (parsed.positionals.length !== 0) throw new UsageError('usage: qsys-mac doctor');
+    helperArgs.push('doctor');
   } else if (command === 'remove' || command === 'uninstall') {
     if (parsed.positionals.length !== 0) throw new UsageError('usage: qsys-mac remove');
     helperArgs.push('remove');

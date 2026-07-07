@@ -226,13 +226,16 @@ The GUI runs `provision.sh` + the emit step; `qsys-mac` (shipped in the installe
 RES="/Volumes/Q-SYS Mac Installer/Q-SYS Mac Installer.app/Contents/Resources"
 QSYS_RES="$RES" "$RES/qsys-mac" install "/path/to/Q-SYS Designer Installer 10.4.0.exe"
 "$RES/qsys-mac" status     # provisioned? where's the app? running?
+"$RES/qsys-mac" doctor     # read-only support diagnostics
 "$RES/qsys-mac" remove     # uninstall app + data dir; stops Wine first so nothing orphans
 ```
 
 It produces a byte-identical result to the GUI emit (same data dir, same ad-hoc-signed app
 with the baked QSC icon). `qsys-mac` self-locates its sibling Resources, or point it anywhere with
-`QSYS_RES`. This is also the most portable base for a future Linux port — the `install`/`remove`/
-`status` surface stays; only the recipe internals behind it would change.
+`QSYS_RES`. `doctor` never mutates state; it reports Rosetta, resource, signature, provisioned,
+installed-app, running, and log-path diagnostics for support. This is also the most portable base
+for a future Linux port — the `install`/`remove`/`status`/`doctor` surface stays; only the recipe
+internals behind it would change.
 
 ## How it works
 

@@ -131,6 +131,39 @@ async function main(): Promise<void> {
     ok('local DMG is mounted, delegated to helper, and detached');
   }
 
+  {
+    const home = await tempHome();
+    const localDmg = path.join(home, 'qsys-mac-installer.dmg');
+    await writeFile(localDmg, 'local dmg');
+
+    const helperCalls: string[][] = [];
+    const runtime: Runtime = {
+      platform: 'darwin',
+      homeDir: home,
+      out: () => undefined,
+      err: () => undefined,
+      runCommand: async (command: string, args: string[], options: CommandOptions): Promise<CommandResult> => {
+        if (command === 'hdiutil' && args[0] === 'attach') {
+          const mount = args[args.indexOf('-mountpoint') + 1];
+          const helperDir = path.join(mount, 'Q-SYS Mac Installer.app', 'Contents', 'Resources');
+          await mkdir(helperDir, { recursive: true });
+          await writeFile(path.join(helperDir, 'qsys-mac'), '#!/bin/sh\n');
+        }
+        if (command.endsWith('/qsys-mac')) {
+          helperCalls.push(args);
+          assert.equal(options.stdio, 'inherit');
+        }
+        return { code: 0, stdout: '', stderr: '' };
+      },
+    };
+
+    const code = await runCli(['--dmg', localDmg, 'doctor'], runtime);
+    assert.equal(code, 0);
+    assert.deepEqual(helperCalls, [['doctor']]);
+    await rm(home, { recursive: true, force: true });
+    ok('doctor command delegates to bundled helper');
+  }
+
   console.log(`\n${pass} qsys-mac bootstrapper assertions passed.`);
 }
 

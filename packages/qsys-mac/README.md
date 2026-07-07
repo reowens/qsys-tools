@@ -19,8 +19,13 @@ Other commands delegate to the same helper in the DMG:
 
 ```sh
 npx qsys-mac status
+npx qsys-mac doctor
 npx qsys-mac remove
 ```
+
+`doctor` prints read-only support diagnostics: Rosetta state, installed app/data state, bundled
+helper presence, signatures where practical, running status, and log paths. It does not repair,
+provision, remove, or upload anything.
 
 ## Requirements
 
@@ -74,5 +79,6 @@ published package:
 
 ```sh
 npm run qsys-mac -- status
+npm run qsys-mac -- doctor
 npm run qsys-mac -- --dmg packages/qsys-mac-installer/dist/qsys-mac-installer.dmg status
 ```

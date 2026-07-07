@@ -119,6 +119,12 @@ the bundled helper. The npm package does not contain Q-SYS Designer or the app
 payload. You provide **your own** free Designer installer download (BYO — nothing
 of QSC's is redistributed).
 
+For support diagnostics, run:
+
+```sh
+npx qsys-mac doctor
+```
+
 Current macOS prerequisite: Rosetta 2. The signed DMG bundles Wine, .NET, `7z`,
 icon tooling, `msiinfo`, and native helper binaries; normal setup does not need
 Homebrew or host Python.
