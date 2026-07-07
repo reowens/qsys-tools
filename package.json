@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
+    "qsys-mac": "tsx packages/qsys-mac/src/bin.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:full": "tsc -p tsconfig.e2e.json --noEmit",
     "test": "npm run --workspaces --if-present test"

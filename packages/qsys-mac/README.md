@@ -69,3 +69,14 @@ npx qsys-mac --dmg packages/qsys-mac-installer/dist/qsys-mac-installer.dmg statu
 ```
 
 Local DMG overrides are not checksum-verified.
+
+## Source Checkout
+
+Inside the `qsys-tools` monorepo, use the workspace script instead of `npx
+qsys-mac`; otherwise npm may resolve the local workspace package before the
+published package:
+
+```sh
+npm run qsys-mac -- status
+npm run qsys-mac -- --dmg packages/qsys-mac-installer/dist/qsys-mac-installer.dmg status
+```

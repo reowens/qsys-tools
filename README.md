@@ -169,6 +169,15 @@ sign/notarize pipeline).
 
 Maintainer release steps are documented in [`RELEASE.md`](RELEASE.md).
 
+When working from this source checkout, use the workspace script instead of
+`npx qsys-mac` so npm does not confuse the local workspace package with the
+published package:
+
+```sh
+npm run qsys-mac -- status
+npm run qsys-mac -- install "/path/to/Q-SYS Designer Installer 10.4.0.exe"
+```
+
 ## Licensing
 
 - npm packages (`qsys-cli`, `qsys-qrc`, `qsys-mcp`): **MIT**

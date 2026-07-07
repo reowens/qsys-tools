@@ -172,28 +172,28 @@ struct SetupView: View {
                             Text(n.detail).font(.caption).foregroundStyle(.secondary)
                                 .textSelection(.enabled)
                                 .fixedSize(horizontal: false, vertical: true)
-                            if n.kind == .blocker, let rosettaError {
+                            if n.action == .installRosetta, let rosettaError {
                                 Text(rosettaError).font(.caption).foregroundStyle(.red)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
-                            if n.kind == .blocker, let rosettaNote {
+                            if n.action == .installRosetta, let rosettaNote {
                                 Label(rosettaNote, systemImage: "checkmark.circle.fill")
                                     .font(.caption).foregroundStyle(.green)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }
                         Spacer(minLength: 0)
-                        // The only blocker EnvChecks emits is missing Rosetta, which we can install
-                        // in-app (one admin prompt) → the re-probe clears the card on success.
                         if n.kind == .blocker {
-                            if installingRosetta {
+                            if n.action == .installRosetta && installingRosetta {
                                 HStack(spacing: 6) {
                                     ProgressView().controlSize(.small)
                                     Text("Installing…").font(.caption).foregroundStyle(.secondary)
                                 }
                             } else {
                                 HStack(spacing: 8) {
-                                    Button("Install Rosetta", action: installRosetta).controlSize(.small)
+                                    if n.action == .installRosetta {
+                                        Button("Install Rosetta", action: installRosetta).controlSize(.small)
+                                    }
                                     Button("Re-check") { notices = EnvChecks.notices }.controlSize(.small)
                                 }
                             }
