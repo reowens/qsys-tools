@@ -115,6 +115,18 @@ and Xcode Command Line Tools (`xcode-select --install`). The signed DMG bundles
 Wine, .NET, `7z`, and icon tooling; `msitools` and Python are still used to map
 the QSC installer payload into the app layout.
 
+Prefer a GUI installer app? Homebrew can install it and its current formula
+dependencies (`msitools`, Homebrew Python):
+
+```sh
+brew tap reowens/qsys
+brew trust reowens/qsys
+brew install --cask qsys-mac-installer
+open -a "Q-SYS Mac Installer"
+```
+
+`brew trust` is required by current Homebrew for third-party cask taps.
+
 The signed installer source lives in
 [`packages/qsys-mac-installer`](packages/qsys-mac-installer). It provisions Wine +
 .NET into Application Support and gives you a real Dock/Finder/menu-bar citizen.

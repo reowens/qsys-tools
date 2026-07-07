@@ -55,6 +55,18 @@ Direct signed-DMG path: download
 [`qsys-mac-installer.dmg`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.1),
 open `Q-SYS Mac Installer.app`, and drop your Q-SYS Designer installer into the window.
 
+Homebrew path:
+
+```sh
+brew tap reowens/qsys
+brew trust reowens/qsys
+brew install --cask qsys-mac-installer
+open -a "Q-SYS Mac Installer"
+```
+
+`brew trust` is required by current Homebrew for third-party cask taps. The cask
+also installs `msitools` and Homebrew Python for the current provisioning flow.
+
 Source recipe path:
 
 ```sh

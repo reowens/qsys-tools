@@ -35,6 +35,20 @@ The signed installer DMG bundles Wine, .NET, `7z`, and icon tooling. `msitools`
 and Python from the Command Line Tools are still required because the wrapper
 reads the installer MSI layout and runs local assembly scripts.
 
+## Homebrew Alternative
+
+Homebrew can install the GUI installer app plus the current formula dependencies
+(`msitools`, Homebrew Python):
+
+```sh
+brew tap reowens/qsys
+brew trust reowens/qsys
+brew install --cask qsys-mac-installer
+open -a "Q-SYS Mac Installer"
+```
+
+`brew trust` is required by current Homebrew for third-party cask taps.
+
 ## Cache
 
 The DMG is cached at:

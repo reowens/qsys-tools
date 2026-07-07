@@ -134,6 +134,17 @@ Mount the DMG read-only and verify:
 
 Create the `qsys-mac-installer-vX.Y.Z` GitHub Release with the DMG asset attached.
 
+After publishing a new installer DMG, update the external Homebrew tap at
+`reowens/homebrew-qsys`:
+
+```sh
+brew tap reowens/qsys
+brew trust reowens/qsys
+brew audit --cask --online reowens/qsys/qsys-mac-installer
+brew install --cask qsys-mac-installer
+brew uninstall --cask qsys-mac-installer
+```
+
 ## Old Repositories
 
 The canonical repository is `reowens/qsys-tools`.
