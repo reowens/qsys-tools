@@ -99,7 +99,16 @@ covered by typed helpers — see [`packages/qsys-qrc`](packages/qsys-qrc).
 
 ## Q-SYS Designer on your Mac
 
-Use the npm bootstrapper:
+For most users, use the signed DMG installer app, run it once, then trash the installer app when you
+are done. The installed `Q-SYS Designer.app` and its Application Support data remain.
+
+Direct DMG path:
+
+```sh
+open https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.3
+```
+
+Or use the npm bootstrapper:
 
 ```sh
 npx qsys-mac install "/path/to/Q-SYS Designer Installer 10.4.0.exe"

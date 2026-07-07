@@ -156,9 +156,21 @@ Mount the DMG read-only and verify:
 - `Q-SYS Mac Installer.app` is present.
 - `LICENSE`, `THIRD-PARTY-NOTICES.md`, and `licenses/` are present.
 - `Contents/Resources/qsys-mac` exists and is executable.
+- `Contents/Resources/bin/msiinfo`, `qsys-assemble-msi`, and
+  `qsys-rename-font-family` exist and are executable.
 - No `qsys-designer-mac` helper remains.
 - Installer and embedded launcher bundle versions match the release version.
 - `codesign --verify --deep --strict` and `spctl` pass for the app.
+
+End-to-end smoke after release publishing:
+
+- Install via Homebrew from `reowens/qsys/qsys-mac-installer`, then verify the app version,
+  signature, stapled ticket, bundled helpers, and `qsys-mac status`.
+- Uninstall/zap the Homebrew cask, install from the signed DMG, and verify Homebrew no longer
+  tracks the app.
+- Run a clean temp provision from the installed app resources with no `QSYS_USE_PYTHON_HELPERS`
+  and with `PYTHONHOME` set to a bogus path.
+- Launch the existing `/Applications/Q-SYS Designer.app` and confirm the main window appears.
 
 Create the `qsys-mac-installer-vX.Y.Z` GitHub Release with the DMG asset attached.
 

@@ -12,6 +12,7 @@ struct SetupView: View {
     @State private var notices: [EnvNotice]
     @State private var emit: EmitPhase = .pending
     @State private var selectedInstaller: String? = nil   // picked, not yet started
+    @State private var showInstallFlow = false
 
     private enum EmitPhase { case pending, installing, done(Emitter.Result), failed(String) }
 
@@ -30,6 +31,10 @@ struct SetupView: View {
     }
 
     private var hasBlocker: Bool { notices.contains { $0.kind == .blocker } }
+    private var installedDesignerPath: String? {
+        let fm = FileManager.default
+        return Uninstaller.appLocations.first { fm.fileExists(atPath: $0) }
+    }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -66,7 +71,15 @@ struct SetupView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private var idleContent: some View {
+    @ViewBuilder private var idleContent: some View {
+        if Uninstaller.isInstalled && !showInstallFlow && selectedInstaller == nil {
+            installedContent
+        } else {
+            installContent
+        }
+    }
+
+    private var installContent: some View {
         VStack(spacing: 16) {
             Text("Drop your own Q-SYS Designer installer (.exe). Nothing is uploaded — setup runs entirely on your Mac.")
                 .font(.callout).foregroundStyle(.secondary)
@@ -79,6 +92,46 @@ struct SetupView: View {
                 dropZone
             }
             removeRow
+        }
+    }
+
+    private var installedContent: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "checkmark.circle.fill").font(.largeTitle).foregroundStyle(.green)
+            Text("Q-SYS Designer is installed.").font(.headline)
+            if let path = installedDesignerPath {
+                Text(path).font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.middle).textSelection(.enabled)
+            } else {
+                Text("Setup data is present, but the launcher app was not found. Reinstall to place it in Applications.")
+                    .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            noticesBanner
+            if removing {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Removing…").font(.caption).foregroundStyle(.secondary)
+                }
+            } else {
+                HStack(spacing: 14) {
+                    Button("Launch Q-SYS Designer") { launchInstalledDesigner() }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(installedDesignerPath == nil || hasBlocker)
+                    Button("Reinstall from Installer…") {
+                        removeMsg = nil
+                        showInstallFlow = true
+                    }
+                    Button("Remove…") { confirmRemove() }.buttonStyle(.link)
+                }
+                if hasBlocker {
+                    Text("Resolve the requirement above before launching.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if let removeMsg {
+                    Text(removeMsg).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                }
+            }
         }
     }
 
@@ -139,8 +192,18 @@ struct SetupView: View {
                 removeMsg = s.failures.isEmpty
                     ? "Removed Q-SYS Designer."
                     : "Removed what I could — couldn’t delete: \(s.failures.map { ($0 as NSString).lastPathComponent }.joined(separator: ", "))."
+                if s.failures.isEmpty {
+                    selectedInstaller = nil
+                    showInstallFlow = false
+                }
             }
         }
+    }
+
+    private func launchInstalledDesigner() {
+        guard let path = installedDesignerPath else { return }
+        NSWorkspace.shared.open(URL(fileURLWithPath: path))
+        NSApp.terminate(nil)
     }
 
     private func installRosetta() {

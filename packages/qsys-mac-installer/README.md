@@ -41,16 +41,20 @@ Homebrew p7zip/icoutils/msitools or host `python3`. Source-only development that
 
 ## Usage
 
-Recommended npm/bootstrapper path:
+Recommended for most users: download the signed DMG, open it, drag/copy `Q-SYS Mac Installer.app`,
+run it once, then trash the installer app when you are done. The installed `Q-SYS Designer.app` and
+its Application Support data remain.
+
+Direct signed-DMG path: download
+[`qsys-mac-installer.dmg`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.3),
+open `Q-SYS Mac Installer.app`, and drop your Q-SYS Designer installer into the window.
+
+npm/bootstrapper path:
 
 ```sh
 npx qsys-mac install "/path/to/Q-SYS Designer Installer 10.4.0.exe"
 open -a "/Applications/Q-SYS Designer.app"
 ```
-
-Direct signed-DMG path: download
-[`qsys-mac-installer.dmg`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.3),
-open `Q-SYS Mac Installer.app`, and drop your Q-SYS Designer installer into the window.
 
 Homebrew path:
 
@@ -95,7 +99,8 @@ prebuilt prefix without the `.app` (dev/debug), use `./launch.sh`.
 ### Known visual limitations
 
 - **Drop shadows do not render correctly.** Designer's functional UI works, but WPF drop shadows
-  are a known cosmetic miss under the current Wine/Rosetta path.
+  are a known cosmetic miss under the current Wine/Rosetta path
+  ([tracked here](https://github.com/reowens/qsys-tools/issues/1)).
 
 ### Opening your files — the `Z:` drive
 
