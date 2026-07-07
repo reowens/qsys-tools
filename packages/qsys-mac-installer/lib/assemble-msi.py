@@ -16,7 +16,8 @@ Usage:  assemble-msi.py <installer.msi> <src_root> <app_target_dir>
   src_root = the directory CONTAINING the OFFLINE folder (the MSI source chain
              begins with the literal 'OFFLINE' segment, so paths resolve against
              OFFLINE's parent).
-Requires: msiinfo (brew install msitools) on PATH.
+Requires: msiinfo on PATH. The packaged installer supplies a bundled copy in Resources/bin;
+source builds can use Homebrew msitools.
 """
 import os
 import sys

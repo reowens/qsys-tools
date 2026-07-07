@@ -95,7 +95,7 @@ preflight() {
   [ "$(uname -s)" = "Darwin" ] || die "macOS only."
   [ "$(uname -m)" = "arm64" ]  || warn "Not Apple Silicon — the recipe was proven on arm64 + Rosetta 2 only."
   command -v 7z   >/dev/null 2>&1 || die "p7zip missing. Install:  brew install p7zip"
-  command -v msiinfo >/dev/null 2>&1 || die "msitools missing (reads the installer MSI's file layout). Install:  brew install msitools"
+  command -v msiinfo >/dev/null 2>&1 || die "msiinfo missing. Packaged installers should include it in Resources/bin; source builds can install it with: brew install msitools"
   command -v python3 >/dev/null 2>&1 || die "python3 missing (maps the installer payload to the app layout). Install the Xcode Command Line Tools:  xcode-select --install"
   command -v curl >/dev/null 2>&1 || die "curl missing."
   command -v wrestool >/dev/null 2>&1 || warn "icoutils missing (brew install icoutils) — the app will use a generic icon."
@@ -568,8 +568,8 @@ emit_app() {
   <key>CFBundleName</key><string>$APP_NAME</string>
   <key>CFBundleDisplayName</key><string>$APP_NAME</string>
   <key>CFBundleIdentifier</key><string>com.byo.qsys-designer-wine</string>
-  <key>CFBundleShortVersionString</key><string>0.1.1</string>
-  <key>CFBundleVersion</key><string>0.1.1</string>
+  <key>CFBundleShortVersionString</key><string>0.1.2</string>
+  <key>CFBundleVersion</key><string>0.1.2</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>launch</string>
   <key>CFBundleIconFile</key><string>QSYSDesigner</string>

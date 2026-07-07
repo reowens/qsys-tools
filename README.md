@@ -110,13 +110,13 @@ the bundled helper. The npm package does not contain Q-SYS Designer or the app
 payload. You provide **your own** free Designer installer download (BYO — nothing
 of QSC's is redistributed).
 
-Current macOS prerequisites: Rosetta 2, `msitools` (`brew install msitools`),
-and Xcode Command Line Tools (`xcode-select --install`). The signed DMG bundles
-Wine, .NET, `7z`, and icon tooling; `msitools` and Python are still used to map
-the QSC installer payload into the app layout.
+Current macOS prerequisites: Rosetta 2 and Xcode Command Line Tools
+(`xcode-select --install`) for `python3`. The signed DMG bundles Wine, .NET,
+`7z`, icon tooling, and `msiinfo`; Python is still used to map the QSC installer
+payload into the app layout.
 
 Prefer a GUI installer app? Homebrew can install it and its current formula
-dependencies (`msitools`, Homebrew Python):
+dependency (Homebrew Python):
 
 ```sh
 brew tap reowens/qsys

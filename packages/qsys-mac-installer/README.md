@@ -31,16 +31,14 @@ never redistributes it.
 
 - **Apple Silicon Mac** (arm64) with **Rosetta 2**
   (`softwareupdate --install-rosetta --agree-to-license`).
-- **msitools**: `brew install msitools` (reads the installer MSI's file layout so the
-  complete app — every component definition, plugin and symbol — is laid down, not a partial set).
 - **Xcode Command Line Tools**: `xcode-select --install` (provides `python3`, which maps the
   installer payload to the app layout).
 - **Your own** `Q-SYS Designer Installer X.exe`, downloaded free from qsys.com.
 
-The signed `qsys-mac-installer.dmg` bundles Wine, .NET, `7z`, and icon tooling, so first run
-does not download those dependencies and does not need Homebrew p7zip/icoutils. Source-only
-`build.sh` development still needs **p7zip** (`brew install p7zip`) and may use **icoutils**
-(`brew install icoutils`) for the app icon.
+The signed `qsys-mac-installer.dmg` bundles Wine, .NET, `7z`, icon tooling, and `msiinfo`, so
+first run does not download those dependencies and does not need Homebrew p7zip/icoutils/msitools.
+Source-only `build.sh` development still needs **p7zip** (`brew install p7zip`) and **msitools**
+(`brew install msitools`), and may use **icoutils** (`brew install icoutils`) for the app icon.
 
 ## Usage
 
@@ -65,7 +63,7 @@ open -a "Q-SYS Mac Installer"
 ```
 
 `brew trust` is required by current Homebrew for third-party cask taps. The cask
-also installs `msitools` and Homebrew Python for the current provisioning flow.
+also installs Homebrew Python for the current provisioning flow.
 
 Source recipe path:
 
@@ -141,8 +139,8 @@ shims stay the only place to fix them. The Swift app natively owns the setup exp
 `.app`'s Dock/Finder identity, and the Developer-ID-notarized download surface.
 
 Build it with `xcodegen generate && xcodebuild` in `app/` (see `app/project.yml`). Status:
-launcher + setup UI working; Wine, .NET, `7z`, and icon tooling are **bundled** so first run
-does not need those downloads/tools; `msitools` and CLT `python3` are still required. Setup
+launcher + setup UI working; Wine, .NET, `7z`, icon tooling, and `msiinfo` are **bundled** so first run
+does not need those downloads/tools; CLT `python3` is still required. Setup
 shows determinate per-step progress, a live extract %, a Cancel button, and surfaces real
 errors with partial-state cleanup + resume.
 **Signing/notarization is scripted** (`scripts/package.sh`) for release builds — see
@@ -308,14 +306,15 @@ A full feasibility + EULA analysis backs this release. Summary:
 
 ### Bundled third-party components
 
-The app bundles free, redistributable deps for Wine/.NET, `7z`, and icon extraction so first-run
-setup does not download those payloads. `msitools` and CLT `python3` are still host prerequisites.
+The app bundles free, redistributable deps for Wine/.NET, `7z`, icon extraction, and MSI table
+inspection so first-run setup does not download those payloads. CLT `python3` is still a host prerequisite.
 Full table + license texts in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md), which is
 shipped inside the `.dmg`. In brief: **Wine** (LGPL-2.1), **.NET 8 runtimes** (Microsoft .NET
 Library License for the redistributable binaries; source MIT), **p7zip** (LGPL/GPL), **libpng**
 (zlib-style), and **icoutils**
-(`wrestool`/`icotool`, **GPL-3.0**). icoutils being GPLv3 is why the distribution carries a
-**written source offer** (in the notices file). Each dep is invoked as a separate process at
+(`wrestool`/`icotool`, **GPL-3.0**), and **msiinfo/msitools** (GPL/LGPL with GLib/libgsf/gettext/PCRE2
+runtime libraries). GPL components are why the distribution carries a **written source offer**
+(in the notices file). Each dep is invoked as a separate process at
 provision time (mere aggregation), so it does not force the wrapper's license — the wrapper is
 **GPL-3.0-or-later** by choice, for one consistent license across the distribution.
 

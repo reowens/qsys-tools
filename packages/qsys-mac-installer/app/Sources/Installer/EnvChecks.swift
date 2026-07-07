@@ -3,7 +3,7 @@
 // EnvChecks — pre-provision environment advisories shown in the first-run setup UI.
 //
 // Detect setup blockers/advisories before the user drops their installer: Rosetta for the
-// x86_64 Wine stack, msiinfo/python3 for MSI layout assembly, and Little Snitch loopback
+// x86_64 Wine stack, python3 for MSI layout assembly, and Little Snitch loopback
 // blocking. Shown only in the .idle setup state, so it's inherently one-time — no persistence
 // needed. Zero QSC code.
 
@@ -64,11 +64,6 @@ enum EnvChecks {
             || fm.fileExists(atPath: "/Library/Little Snitch")
     }
 
-    static var msiinfoMissing: Bool {
-        if ProcessInfo.processInfo.environment["QSYS_FORCE_MSIINFO_MISSING"] == "1" { return true }
-        return !commandExists("msiinfo")
-    }
-
     static var python3Missing: Bool {
         if ProcessInfo.processInfo.environment["QSYS_FORCE_PYTHON3_MISSING"] == "1" { return true }
         return !commandExists("python3")
@@ -96,13 +91,6 @@ enum EnvChecks {
                 title: "Rosetta 2 required",
                 detail: "Q-SYS Designer runs x86_64 Wine under Rosetta 2, which isn’t installed yet. Install it to continue.",
                 action: .installRosetta))
-        }
-        if msiinfoMissing {
-            out.append(EnvNotice(
-                kind: .blocker,
-                title: "msitools required",
-                detail: "Setup needs msiinfo to read the Q-SYS Designer installer layout. Install it with Homebrew: brew install msitools, then Re-check.",
-                action: .recheck))
         }
         if python3Missing {
             out.append(EnvNotice(

@@ -64,9 +64,9 @@ cmd_install() {
   QSYS_PREBUILT_APPMENU="$RES/bin/appmenu.dylib" \
   QSYS_PREBUILT_ICONPAD="$RES/bin/iconpad" \
   QSYS_PREPATCHED_LOADER="$RES/bin/wine-loader-prepatched" \
-  PATH="$RES/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" \
-    bash "$RES/provision.sh" "$exe" \
-      | sed -e 's/^@@QSYS:STEP \([0-9]*\) \([0-9]*\) \(.*\)@@$/  --> [\1\/\2] \3/' -e '/^@@QSYS:EXTRACT /d' \
+  PATH="$RES/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin" \
+    /bin/bash "$RES/provision.sh" "$exe" \
+      | /usr/bin/sed -e 's/^@@QSYS:STEP \([0-9]*\) \([0-9]*\) \(.*\)@@$/  --> [\1\/\2] \3/' -e '/^@@QSYS:EXTRACT /d' \
     || rc=$?
   [ "$rc" -eq 0 ] || die "provisioning failed (see the [qsys] ERROR above)"
 

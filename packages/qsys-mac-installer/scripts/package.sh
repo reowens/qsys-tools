@@ -167,7 +167,7 @@ cp "$ROOT/THIRD-PARTY-NOTICES.md" "$STAGE/THIRD-PARTY-NOTICES.md" \
 cp "$ROOT/LICENSE" "$STAGE/LICENSE" \
   || die "LICENSE missing — the dmg must carry the wrapper's GPL-3.0 license text."
 mkdir -p "$STAGE/licenses"
-for _lic in GPL-3.0.txt LGPL-2.1.txt MIT-dotnet.txt libpng-LICENSE.txt; do
+for _lic in GPL-2.0.txt GPL-3.0.txt LGPL-2.1.txt MIT-dotnet.txt libpng-LICENSE.txt PCRE2-LICENCE.md; do
   cp "$ROOT/licenses/$_lic" "$STAGE/licenses/$_lic" \
     || die "licenses/$_lic missing — the dmg must ship every bundled component's full license text."
 done

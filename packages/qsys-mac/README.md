@@ -27,18 +27,17 @@ npx qsys-mac remove
 - macOS on Apple Silicon.
 - Node.js 18.17 or newer.
 - Rosetta 2: `softwareupdate --install-rosetta --agree-to-license`.
-- msitools: `brew install msitools`.
 - Xcode Command Line Tools: `xcode-select --install`.
 - Your own `Q-SYS Designer Installer X.exe`, downloaded from qsys.com.
 
-The signed installer DMG bundles Wine, .NET, `7z`, and icon tooling. `msitools`
-and Python from the Command Line Tools are still required because the wrapper
-reads the installer MSI layout and runs local assembly scripts.
+The signed installer DMG bundles Wine, .NET, `7z`, icon tooling, and `msiinfo`.
+Python from the Command Line Tools is still required because the wrapper runs
+local assembly scripts.
 
 ## Homebrew Alternative
 
-Homebrew can install the GUI installer app plus the current formula dependencies
-(`msitools`, Homebrew Python):
+Homebrew can install the GUI installer app plus the current formula dependency
+(Homebrew Python):
 
 ```sh
 brew tap reowens/qsys

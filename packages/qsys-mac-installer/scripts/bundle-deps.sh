@@ -4,8 +4,9 @@
 # bundle-deps.sh — Phase 3 (Tier B) build-time step. Populates app/Resources/{bin,cache}
 # with Wine/.NET plus helper binaries so first-run provisioning does not download them or
 # need clang/otool for the bundled shims. Run once before xcodebuild;
-# idempotent + cached (skips work already done). Ships only LGPL/MIT-redistributable bytes
-# (Wine, .NET runtimes, p7zip, icoutils, libpng) + our own compiled shims. Zero QSC bytes.
+# idempotent + cached (skips work already done). Ships only redistributable bytes
+# (Wine, .NET runtimes, p7zip, icoutils, libpng, msiinfo + dylibs) + our own compiled shims.
+# Zero QSC bytes.
 #
 #   scripts/bundle-deps.sh            # build the bundle (uses cached downloads if present)
 #   FORCE=1 scripts/bundle-deps.sh    # rebuild everything from scratch
@@ -49,8 +50,21 @@ fetch "$DOTNET_ASPNET_URL"  "$DOTNET_ASPNET_SHA256"
 #    paths to @loader_path so they resolve from Resources/bin. Re-sign anything
 #    we mutate (changing a load command invalidates the signature).
 # ----------------------------------------------------------------------------
-need() { command -v "$1" >/dev/null 2>&1 || die "$1 missing on the build machine (brew install p7zip icoutils)."; }
-need 7z; need wrestool; need icotool
+need() { command -v "$1" >/dev/null 2>&1 || die "$1 missing on the build machine (${2:-install it with Homebrew})."; }
+is_macho() { file "$1" 2>/dev/null | grep -q "Mach-O"; }
+is_system_load() {
+  case "$1" in
+    /usr/lib/*|/System/Library/*|@loader_path/*|@executable_path/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+is_absolute_load() {
+  case "$1" in /*) return 0 ;; *) return 1 ;; esac
+}
+need 7z "brew install p7zip"
+need wrestool "brew install icoutils"
+need icotool "brew install icoutils"
+need msiinfo "brew install msitools"
 
 # p7zip: the `7z` front-end dlopens `7z.so` from its OWN directory → ship both together.
 # (Both link only system frameworks — verified — so no extra dylibs.) Homebrew's `7z` on
@@ -89,6 +103,65 @@ chmod u+w "$BIN/libpng16.16.dylib" "$BIN/icotool"
 install_name_tool -change "$PNG" "@loader_path/libpng16.16.dylib" "$BIN/icotool"
 codesign --force -s - "$BIN/libpng16.16.dylib" >/dev/null 2>&1 || true
 codesign --force -s - "$BIN/icotool"            >/dev/null 2>&1 || true
+
+# msiinfo: reads MSI Directory/Component/File tables for the complete app assembly.
+# Copy it plus every non-system dylib it links, recursively. Homebrew bottles use absolute
+# Cellar/opt install names; rewrite them to @loader_path so the stack resolves from Resources/bin.
+say "tool ← msiinfo (+ libmsi/glib/libgsf/gettext/pcre2 dylibs)"
+cp -f "$(command -v msiinfo)" "$BIN/msiinfo"
+chmod u+w "$BIN/msiinfo"
+MSIINFO_BUNDLE_LIST="$(mktemp)"
+trap 'rm -f "$MSIINFO_BUNDLE_LIST"' EXIT
+printf '%s\n' "$BIN/msiinfo" > "$MSIINFO_BUNDLE_LIST"
+
+track_msiinfo_file() {
+  grep -qxF "$1" "$MSIINFO_BUNDLE_LIST" 2>/dev/null || printf '%s\n' "$1" >> "$MSIINFO_BUNDLE_LIST"
+}
+
+copy_msiinfo_dylibs() {
+  local changed=1 macho dep dest
+  while [ "$changed" -eq 1 ]; do
+    changed=0
+    while IFS= read -r macho; do
+      [ -f "$macho" ] && is_macho "$macho" || continue
+      while IFS= read -r dep; do
+        [ -n "$dep" ] || continue
+        is_system_load "$dep" && continue
+        is_absolute_load "$dep" || die "unexpected non-absolute dependency in $(basename "$macho"): $dep"
+        [ -f "$dep" ] || die "dependency not found for $(basename "$macho"): $dep"
+        dest="$BIN/$(basename "$dep")"
+        if ! grep -qxF "$dest" "$MSIINFO_BUNDLE_LIST" 2>/dev/null; then
+          cp -f "$dep" "$dest"
+          chmod u+w "$dest"
+          track_msiinfo_file "$dest"
+          changed=1
+        fi
+      done < <(otool -L "$macho" | awk 'NR > 1 { print $1 }')
+    done < "$MSIINFO_BUNDLE_LIST"
+  done
+}
+
+rewrite_bin_loads() {
+  local macho dep base
+  while IFS= read -r macho; do
+    [ -f "$macho" ] && is_macho "$macho" || continue
+    chmod u+w "$macho"
+    case "$macho" in *.dylib) install_name_tool -id "@loader_path/$(basename "$macho")" "$macho" ;; esac
+    while IFS= read -r dep; do
+      [ -n "$dep" ] || continue
+      is_system_load "$dep" && continue
+      is_absolute_load "$dep" || continue
+      base="$(basename "$dep")"
+      [ -f "$BIN/$base" ] || continue
+      install_name_tool -change "$dep" "@loader_path/$base" "$macho"
+    done < <(otool -L "$macho" | awk 'NR > 1 { print $1 }')
+    codesign --force -s - "$macho" >/dev/null 2>&1 || true
+  done < "$MSIINFO_BUNDLE_LIST"
+}
+
+copy_msiinfo_dylibs
+rewrite_bin_loads
+"$BIN/msiinfo" --version >/dev/null 2>&1 || die "bundled msiinfo failed to run after relinking."
 
 # ----------------------------------------------------------------------------
 # 3. Pre-compile the in-process shims (universal: arm64 native + the x86_64 slice

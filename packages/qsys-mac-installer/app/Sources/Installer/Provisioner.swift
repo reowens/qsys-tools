@@ -43,7 +43,7 @@ final class Provisioner: ObservableObject {
         var env = ProcessInfo.processInfo.environment
         env["WRAP_HOME"] = DataDir.root
         // Tier B (Phase 3): point the recipe at bundled deps so first-run avoids Wine/.NET
-        // downloads and uses our 7z/icoutils binaries. msiinfo and python3 still come from
+        // downloads and uses our 7z/icoutils/msiinfo binaries. python3 still comes from
         // host prerequisites until those assembly pieces are bundled too.
         let bin = "\(resources)/bin"
         env["CACHE"] = "\(resources)/cache"                       // Wine tarball + .NET installers (offline)
@@ -51,7 +51,7 @@ final class Provisioner: ObservableObject {
         env["QSYS_PREBUILT_ICONPAD"] = "\(bin)/iconpad"           // pre-compiled (no clang)
         env["QSYS_PREPATCHED_LOADER"] = "\(bin)/wine-loader-prepatched"  // pre-patched (no python3/otool)
         // Security-ordered PATH, built explicitly rather than inheriting the ambient order (a dev
-        // shell leads with Homebrew): bundled Tier-B tools first (7z + icoutils must win), then the
+        // shell leads with Homebrew): bundled Tier-B tools first (7z + icoutils + msiinfo must win), then the
         // system dirs, then the Homebrew prefixes LAST as a harmless fallback. System-before-Homebrew
         // is load-bearing — it stops a poisoned /opt/homebrew/bin/{curl,shasum,tar,bash} from
         // shadowing the real tools the recipe shells out to during provisioning.

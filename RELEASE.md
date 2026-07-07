@@ -13,6 +13,13 @@ package-scoped.
 
 Use release titles without the `v` prefix, for example `qsys-mcp 0.3.2`.
 
+## GitHub Release Notes
+
+Write release notes as real Markdown files and pass them with `gh release create
+--notes-file <file>` or `gh release edit --notes-file <file>`. Do not pass
+escaped newline strings through `--notes`; GitHub will save literal `\n` text
+instead of rendered Markdown line breaks.
+
 ## Npm Packages
 
 Publish npm packages in dependency order:
@@ -99,6 +106,20 @@ installer release it bootstraps.
 ## qsys-mac-installer
 
 `qsys-mac-installer` is the native macOS app/DMG distribution.
+
+### Bundled msiinfo Checklist
+
+The installer bundles `msiinfo` so first-run setup no longer requires users to
+install Homebrew `msitools`. When updating this bundle:
+
+- Run `packages/qsys-mac-installer/scripts/bundle-deps.sh` on Apple Silicon.
+- Confirm `app/Resources/bin/msiinfo --version` works.
+- Confirm every non-system `msiinfo`/dylib load path is rewritten to `@loader_path`.
+- Confirm `packages/qsys-mac-installer/THIRD-PARTY-NOTICES.md` lists `msiinfo`,
+  `libmsi`, GLib/GIO/GObject/GModule, libgsf, libintl, and PCRE2.
+- Confirm `packages/qsys-mac-installer/licenses/` carries required full license texts.
+- Run a clean install using the packaged helper with `Resources/bin` first in `PATH`,
+  and verify the MSI assembly reports all `.luax` component definitions.
 
 Before building the DMG:
 
