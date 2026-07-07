@@ -22,6 +22,7 @@ source "$HERE/lib/recipe.sh"
 [ "$(uname -s)" = "Darwin" ] || die "macOS only (this bundles macOS-native tools)."
 command -v install_name_tool >/dev/null 2>&1 || die "install_name_tool missing — install Command Line Tools (build machine only)."
 command -v clang   >/dev/null 2>&1 || die "clang missing — needed to pre-compile the shims (build machine only)."
+command -v swiftc  >/dev/null 2>&1 || die "swiftc missing — needed to pre-compile native helpers (build machine only)."
 command -v python3 >/dev/null 2>&1 || die "python3 missing — needed to pre-patch the loader (build machine only)."
 
 mkdir -p "$BIN" "$CACHE_OUT"
@@ -164,7 +165,15 @@ rewrite_bin_loads
 "$BIN/msiinfo" --version >/dev/null 2>&1 || die "bundled msiinfo failed to run after relinking."
 
 # ----------------------------------------------------------------------------
-# 3. Pre-compile the in-process shims (universal: arm64 native + the x86_64 slice
+# 3. Pre-compile native helper candidates. These are opt-in until they match
+#    the existing Python scripts across clean provisioning tests.
+# ----------------------------------------------------------------------------
+say "helper ← qsys-assemble-msi (native)"
+swiftc -O -o "$BIN/qsys-assemble-msi" "$RECIPE_DIR/assemble-msi.swift"
+codesign --force -s - "$BIN/qsys-assemble-msi" >/dev/null 2>&1 || true
+
+# ----------------------------------------------------------------------------
+# 4. Pre-compile the in-process shims (universal: arm64 native + the x86_64 slice
 #    Wine needs under Rosetta). End-user machines have no clang.
 # ----------------------------------------------------------------------------
 say "shim ← appmenu.dylib (universal)"
@@ -178,7 +187,7 @@ clang -arch x86_64 -arch arm64 -framework Cocoa -fobjc-arc \
 codesign --force -s - "$BIN/iconpad" >/dev/null 2>&1 || true
 
 # ----------------------------------------------------------------------------
-# 4. Pre-patch the Wine unix loader's embedded CFBundleName (the bold menu-bar
+# 5. Pre-patch the Wine unix loader's embedded CFBundleName (the bold menu-bar
 #    name). The bundled tarball is pinned → its loader bytes are deterministic,
 #    so this build-time patched copy is byte-correct for the loader the user will
 #    extract. The recipe drops it in place at provision time (no python3/otool).

@@ -146,6 +146,17 @@ errors with partial-state cleanup + resume.
 **Signing/notarization is scripted** (`scripts/package.sh`) for release builds — see
 [Distribution](#distribution--signed--notarized-dmg) below.
 
+### Native assembler derisk path
+
+`scripts/bundle-deps.sh` also builds `Resources/bin/qsys-assemble-msi`, a native Swift port of
+`lib/assemble-msi.py`. It is opt-in for now: set `QSYS_NATIVE_HELPERS=1` or
+`QSYS_ASSEMBLE_MSI=/path/to/qsys-assemble-msi` to use it. The default remains Python until the
+native path has more install coverage. Validate parity with:
+
+```sh
+scripts/compare-assemble-msi.sh "/path/to/Q-SYS Designer Installer 10.4.0.exe"
+```
+
 ## Distribution — signed & notarized `.dmg`
 
 `scripts/package.sh` produces a Gatekeeper-clean **`qsys-mac-installer.dmg`** holding two bundles:

@@ -326,6 +326,8 @@ cleanup_extract() {
 # old content-marker hand-pick that shipped ~40% and dropped the entire component layer (which
 # NRE'd the LCQ-LN inventory drag and boxed the missing-symbol components). msiinfo reads the
 # tables; assemble-msi.py does the path math (shell joins choke on the mangled identifiers).
+# A native helper can be opted into with QSYS_NATIVE_HELPERS=1 or QSYS_ASSEMBLE_MSI=/path/to/helper;
+# Python stays default until native output is proven byte-identical across clean installs.
 assemble() {
   APP="$WINEPREFIX/drive_c/$APP_SUBDIR"
   mkdir -p "$APP"
@@ -333,7 +335,14 @@ assemble() {
   [ -n "$msi" ] && [ -f "$msi" ] || die "Installer MSI not found under $EXTRACT — can't map the app layout."
   say "Mapping the complete app from the installer MSI…"
   # $EXTRACT is the source root: the MSI source chain begins with the literal OFFLINE segment.
-  python3 "$RECIPE_DIR/assemble-msi.py" "$msi" "$EXTRACT" "$APP" || die "MSI-mapped assembly failed (see the error above)."
+  if [ -n "${QSYS_ASSEMBLE_MSI:-}" ] || [ "${QSYS_NATIVE_HELPERS:-0}" = "1" ]; then
+    local helper="${QSYS_ASSEMBLE_MSI:-}"
+    if [ -z "$helper" ]; then helper="$(command -v qsys-assemble-msi 2>/dev/null || true)"; fi
+    [ -n "$helper" ] && [ -x "$helper" ] || die "native MSI assembler requested but not found. Run scripts/bundle-deps.sh and ensure Resources/bin is first in PATH, or set QSYS_ASSEMBLE_MSI."
+    "$helper" "$msi" "$EXTRACT" "$APP" || die "native MSI-mapped assembly failed (see the error above)."
+  else
+    python3 "$RECIPE_DIR/assemble-msi.py" "$msi" "$EXTRACT" "$APP" || die "MSI-mapped assembly failed (see the error above)."
+  fi
 }
 
 # ----------------------------------------------------------------------------

@@ -120,6 +120,9 @@ install Homebrew `msitools`. When updating this bundle:
 - Confirm `packages/qsys-mac-installer/licenses/` carries required full license texts.
 - Run a clean install using the packaged helper with `Resources/bin` first in `PATH`,
   and verify the MSI assembly reports all `.luax` component definitions.
+- If changing the native MSI assembler, run
+  `packages/qsys-mac-installer/scripts/compare-assemble-msi.sh <installer.exe>` and
+  verify its manifest comparison passes.
 
 Before building the DMG:
 
