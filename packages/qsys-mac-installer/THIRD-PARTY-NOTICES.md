@@ -1,8 +1,9 @@
 # Third-party notices
 
 The Q-SYS Designer installer bundles the free, redistributable components below to set up
-Q-SYS Designer on your Mac offline, with no developer toolchain. It bundles **no QSC / Q-SYS
-bytes** — Q-SYS Designer is your own BYO download and is never redistributed here.
+Q-SYS Designer on your Mac without downloading Wine/.NET/helper payloads at first run. It
+bundles **no QSC / Q-SYS bytes** — Q-SYS Designer is your own BYO download and is never
+redistributed here.
 
 > **Unofficial — not affiliated with, endorsed, or sponsored by QSC, LLC.** "Q-SYS" and
 > "Q-SYS Designer" are trademarks of QSC, LLC, used here only nominatively to name the

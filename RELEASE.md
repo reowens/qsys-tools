@@ -27,7 +27,7 @@ npm publish --workspace=qsys-mac --access public
 If npm asks for 2FA, pass the current OTP:
 
 ```sh
-npm publish --workspace=qsys-mcp --access public --otp="$OTP"
+npm publish --workspace=<package> --access public --otp="$OTP"
 ```
 
 Before publishing:
@@ -89,6 +89,8 @@ Before publishing `qsys-mac`:
   final `qsys-mac-installer-vX.Y.Z/qsys-mac-installer.dmg` URL.
 - Replace `DEFAULT_RELEASE.sha256` with the exact uploaded DMG SHA-256.
 - Run `npm pack --workspace=qsys-mac --dry-run --json` and inspect the tarball contents.
+- Confirm `npx qsys-mac --dmg packages/qsys-mac-installer/dist/qsys-mac-installer.dmg status`
+  mounts the local DMG, delegates to the bundled helper, and detaches cleanly.
 
 Create a source-only GitHub Release for `qsys-mac-vX.Y.Z` after npm is live.
 Attach no assets; link to the npm package, the package directory, and the

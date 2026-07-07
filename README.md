@@ -110,11 +110,16 @@ the bundled helper. The npm package does not contain Q-SYS Designer or the app
 payload. You provide **your own** free Designer installer download (BYO — nothing
 of QSC's is redistributed).
 
+Current macOS prerequisites: Rosetta 2, `msitools` (`brew install msitools`),
+and Xcode Command Line Tools (`xcode-select --install`). The signed DMG bundles
+Wine, .NET, `7z`, and icon tooling; `msitools` and Python are still used to map
+the QSC installer payload into the app layout.
+
 The signed installer source lives in
 [`packages/qsys-mac-installer`](packages/qsys-mac-installer). It provisions Wine +
 .NET into Application Support and gives you a real Dock/Finder/menu-bar citizen.
-The renamed signed DMG is published from
-[`qsys-mac-installer` releases](https://github.com/reowens/qsys-tools/releases).
+The current signed DMG is
+[`qsys-mac-installer 0.1.1`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.1).
 
 Bonus: Designer's **Emulate mode** serves QRC on `127.0.0.1:1710`, so all of the
 tools above work hardware-free against it — that's how this repo's tooling is

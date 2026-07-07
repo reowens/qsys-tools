@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Robert Owens
 # bundle-deps.sh — Phase 3 (Tier B) build-time step. Populates app/Resources/{bin,cache}
-# with everything first-run provisioning needs so the user's machine needs NO network and
-# NO developer toolchain (no brew / clang / python3 / otool). Run once before xcodebuild;
+# with Wine/.NET plus helper binaries so first-run provisioning does not download them or
+# need clang/otool for the bundled shims. Run once before xcodebuild;
 # idempotent + cached (skips work already done). Ships only LGPL/MIT-redistributable bytes
 # (Wine, .NET runtimes, p7zip, icoutils, libpng) + our own compiled shims. Zero QSC bytes.
 #

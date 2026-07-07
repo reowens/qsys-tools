@@ -31,16 +31,31 @@ never redistributes it.
 
 - **Apple Silicon Mac** (arm64) with **Rosetta 2**
   (`softwareupdate --install-rosetta --agree-to-license`).
-- **p7zip**: `brew install p7zip` (extracts the installer; the installer never runs).
 - **msitools**: `brew install msitools` (reads the installer MSI's file layout so the
   complete app — every component definition, plugin and symbol — is laid down, not a partial set).
 - **Xcode Command Line Tools**: `xcode-select --install` (provides `python3`, which maps the
-  installer payload to the app layout, and `clang` for the app-menu shim).
+  installer payload to the app layout).
 - **Your own** `Q-SYS Designer Installer X.exe`, downloaded free from qsys.com.
-- Bandwidth for first run: the wrapper downloads a free Wine build (~190 MB) and the
-  .NET 8 runtimes (~70 MB) into a cache, unless you point it at existing copies.
+
+The signed `qsys-mac-installer.dmg` bundles Wine, .NET, `7z`, and icon tooling, so first run
+does not download those dependencies and does not need Homebrew p7zip/icoutils. Source-only
+`build.sh` development still needs **p7zip** (`brew install p7zip`) and may use **icoutils**
+(`brew install icoutils`) for the app icon.
 
 ## Usage
+
+Recommended npm/bootstrapper path:
+
+```sh
+npx qsys-mac install "/path/to/Q-SYS Designer Installer 10.4.0.exe"
+open -a "/Applications/Q-SYS Designer.app"
+```
+
+Direct signed-DMG path: download
+[`qsys-mac-installer.dmg`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.1),
+open `Q-SYS Mac Installer.app`, and drop your Q-SYS Designer installer into the window.
+
+Source recipe path:
 
 ```sh
 ./build.sh --installer "/path/to/Q-SYS Designer Installer 10.4.0.exe"
@@ -114,9 +129,10 @@ shims stay the only place to fix them. The Swift app natively owns the setup exp
 `.app`'s Dock/Finder identity, and the Developer-ID-notarized download surface.
 
 Build it with `xcodegen generate && xcodebuild` in `app/` (see `app/project.yml`). Status:
-launcher + setup UI working; Wine + .NET are **bundled** so first run is fully offline and
-needs no developer toolchain (Tier B); setup shows determinate per-step progress, a live
-extract %, a Cancel button, and surfaces real errors with partial-state cleanup + resume.
+launcher + setup UI working; Wine, .NET, `7z`, and icon tooling are **bundled** so first run
+does not need those downloads/tools; `msitools` and CLT `python3` are still required. Setup
+shows determinate per-step progress, a live extract %, a Cancel button, and surfaces real
+errors with partial-state cleanup + resume.
 **Signing/notarization is scripted** (`scripts/package.sh`) for release builds — see
 [Distribution](#distribution--signed--notarized-dmg) below.
 
@@ -143,7 +159,7 @@ signature); the build asserts the nested launcher stays valid after the outer si
 carries `THIRD-PARTY-NOTICES.md` (bundled-dep licenses + the icoutils GPLv3 source offer) and is
 itself signed + notarized + stapled.
 
-Wine is *not* inside either bundle — it ships as a tarball in `Resources/cache` and is extracted
+Wine is *not* inside either app bundle — it ships as a tarball in `Resources/cache` and is extracted
 + ad-hoc-signed into `~/Library/Application Support/Q-SYS Designer/` at **provision** time,
 outside notarization. So the notarized surface is just the Swift code + the `Resources/bin`
 toolchain (`7z`, icoutils, `appmenu.dylib`, the pre-patched Wine loader).
@@ -280,7 +296,8 @@ A full feasibility + EULA analysis backs this release. Summary:
 
 ### Bundled third-party components
 
-The app bundles free, redistributable deps so first-run setup is offline + toolchain-free.
+The app bundles free, redistributable deps for Wine/.NET, `7z`, and icon extraction so first-run
+setup does not download those payloads. `msitools` and CLT `python3` are still host prerequisites.
 Full table + license texts in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md), which is
 shipped inside the `.dmg`. In brief: **Wine** (LGPL-2.1), **.NET 8 runtimes** (Microsoft .NET
 Library License for the redistributable binaries; source MIT), **p7zip** (LGPL/GPL), **libpng**
