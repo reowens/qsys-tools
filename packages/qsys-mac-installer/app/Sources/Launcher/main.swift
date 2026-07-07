@@ -32,7 +32,7 @@ if DataDir.isProvisioned {
 // Not set up — the App Support data dir was removed, this ran before the installer, or the
 // data dir was provisioned by an OLDER recipe this build refuses to boot (schema gate,
 // a stale layout looks installed but is missing components and NREs in use).
-// There is no setup UI here (that lives in "Install Q-SYS Designer"); point the user at it.
+// There is no setup UI here (that lives in "Q-SYS Mac Installer"); point the user at it.
 let app = NSApplication.shared
 app.setActivationPolicy(.regular)
 app.activate(ignoringOtherApps: true)
@@ -40,10 +40,10 @@ app.activate(ignoringOtherApps: true)
 let alert = NSAlert()
 if DataDir.isStaleProvision {
     alert.messageText = "Q-SYS Designer needs to be updated"
-    alert.informativeText = "This install was set up by an older version of the installer and is missing components. Run “Install Q-SYS Designer” again with your Designer installer to update it, then open it again. Your designs are not affected."
+    alert.informativeText = "This install was set up by an older version of the installer and is missing components. Run “Q-SYS Mac Installer” again with your Designer installer to update it, then open it again. Your designs are not affected."
 } else {
     alert.messageText = "Q-SYS Designer isn’t set up yet"
-    alert.informativeText = "Run “Install Q-SYS Designer” to set up Q-SYS Designer on this Mac, then open it again."
+    alert.informativeText = "Run “Q-SYS Mac Installer” to set up Q-SYS Designer on this Mac, then open it again."
 }
 alert.alertStyle = .warning
 alert.addButton(withTitle: "OK")

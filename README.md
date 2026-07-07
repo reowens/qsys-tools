@@ -6,6 +6,7 @@
 [![npm qsys-cli](https://img.shields.io/npm/v/qsys-cli.svg?label=qsys-cli)](https://www.npmjs.com/package/qsys-cli)
 [![npm qsys-qrc](https://img.shields.io/npm/v/qsys-qrc.svg?label=qsys-qrc)](https://www.npmjs.com/package/qsys-qrc)
 [![npm qsys-mcp](https://img.shields.io/npm/v/qsys-mcp.svg?label=qsys-mcp)](https://www.npmjs.com/package/qsys-mcp)
+[![npm qsys-mac](https://img.shields.io/npm/v/qsys-mac.svg?label=qsys-mac)](https://www.npmjs.com/package/qsys-mac)
 [![node ≥18](https://img.shields.io/badge/node-%E2%89%A518-brightgreen.svg)](https://nodejs.org)
 [![license: MIT + GPL-3.0](https://img.shields.io/badge/license-MIT%20%2B%20GPL--3.0-blue.svg)](#licensing)
 
@@ -19,7 +20,8 @@ code, no SDK, no hardware required for development.**
 | [`qsys-cli`](packages/qsys) | CLI (command: `qsys`) — status, component inventory, get/set controls with ramps, live watch, snapshots |
 | [`qsys-qrc`](packages/qsys-qrc) | TypeScript QRC client — wire framing, change groups, keepalive, transparent auto-reconnect, typed protocol surface |
 | [`qsys-mcp`](packages/qsys-mcp) | [MCP](https://modelcontextprotocol.io) server (`io.github.reowens/qsys-mcp` in the MCP Registry) — 18 tools that let an AI agent inspect and drive a live Q-SYS system |
-| [`qsys-mac`](packages/qsys-mac) | **Q-SYS Designer for macOS** — notarized BYO-installer wrapper (native app; GPL-3.0, not an npm package) |
+| [`qsys-mac`](packages/qsys-mac) | npm bootstrapper (command: `qsys-mac`) — downloads/verifies the signed Q-SYS Mac Installer DMG and delegates to its helper |
+| [`qsys-mac-installer`](packages/qsys-mac-installer) | **Q-SYS Designer for macOS** — signed/notarized BYO-installer wrapper app + DMG source |
 
 ## Quick start — shell
 
@@ -97,12 +99,22 @@ covered by typed helpers — see [`packages/qsys-qrc`](packages/qsys-qrc).
 
 ## Q-SYS Designer on your Mac
 
-[`packages/qsys-mac`](packages/qsys-mac) is a signed + notarized macOS app that runs
-QSC's Windows-only Q-SYS Designer on Apple-Silicon Macs — no VM, no CrossOver. You
-drop in **your own** free Designer installer download (BYO — nothing of QSC's is
-redistributed); it provisions Wine + .NET into Application Support and gives you a
-real Dock/Finder/menu-bar citizen. Grab the notarized DMG from
-[Releases](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-v0.1.0).
+Use the npm bootstrapper:
+
+```sh
+npx qsys-mac install "/path/to/Q-SYS Designer Installer 10.4.0.exe"
+```
+
+It downloads and verifies the signed Q-SYS Mac Installer DMG, mounts it, and runs
+the bundled helper. The npm package does not contain Q-SYS Designer or the app
+payload. You provide **your own** free Designer installer download (BYO — nothing
+of QSC's is redistributed).
+
+The signed installer source lives in
+[`packages/qsys-mac-installer`](packages/qsys-mac-installer). It provisions Wine +
+.NET into Application Support and gives you a real Dock/Finder/menu-bar citizen.
+The renamed signed DMG is published from
+[`qsys-mac-installer` releases](https://github.com/reowens/qsys-tools/releases).
 
 Bonus: Designer's **Emulate mode** serves QRC on `127.0.0.1:1710`, so all of the
 tools above work hardware-free against it — that's how this repo's tooling is
@@ -134,8 +146,8 @@ npm test                # full suites
 npm run typecheck:full  # includes the emulator-backed test files
 ```
 
-`qsys-mac` builds separately with Xcode — see
-[`packages/qsys-mac`](packages/qsys-mac) (`scripts/package.sh` for the
+`qsys-mac-installer` builds separately with Xcode — see
+[`packages/qsys-mac-installer`](packages/qsys-mac-installer) (`scripts/package.sh` for the
 sign/notarize pipeline).
 
 Maintainer release steps are documented in [`RELEASE.md`](RELEASE.md).
@@ -143,7 +155,7 @@ Maintainer release steps are documented in [`RELEASE.md`](RELEASE.md).
 ## Licensing
 
 - npm packages (`qsys-cli`, `qsys-qrc`, `qsys-mcp`): **MIT**
-- `qsys-mac` (the Designer-on-Mac wrapper): **GPL-3.0-or-later**
+- `qsys-mac` npm bootstrapper and `qsys-mac-installer` wrapper: **GPL-3.0-or-later**
 
 Each package carries its own LICENSE file.
 

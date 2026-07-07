@@ -1,0 +1,53 @@
+{
+  "name": "qsys-mac",
+  "version": "0.1.1",
+  "description": "npm bootstrapper for the signed Q-SYS Mac Installer DMG.",
+  "type": "module",
+  "bin": {
+    "qsys-mac": "dist/bin.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "postbuild": "node -e \"require('fs').chmodSync('dist/bin.js', 0o755)\"",
+    "prepare": "npm run build",
+    "test": "tsx test/bootstrapper.ts"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/reowens/qsys-tools.git",
+    "directory": "packages/qsys-mac"
+  },
+  "bugs": {
+    "url": "https://github.com/reowens/qsys-tools/issues"
+  },
+  "homepage": "https://github.com/reowens/qsys-tools/tree/main/packages/qsys-mac#readme",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "license": "GPL-3.0-or-later",
+  "keywords": [
+    "q-sys",
+    "qsys",
+    "qsc",
+    "mac",
+    "macos",
+    "installer",
+    "bootstrapper",
+    "wine",
+    "av",
+    "audiovisual"
+  ]
+}

@@ -33,7 +33,7 @@ struct SetupView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("Install Q-SYS Designer").font(.title2).bold()
+            Text("Q-SYS Mac Installer").font(.title2).bold()
 
             switch provisioner.state {
             case .idle:            idleContent

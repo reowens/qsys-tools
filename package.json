@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Monorepo for the qsys family: qsys-qrc (QRC client core) + qsys-cli (control CLI) + qsys-mcp (MCP server).",
+  "description": "Monorepo for the qsys family: qsys-qrc (QRC client core), qsys-cli (control CLI), qsys-mcp (MCP server), and qsys-mac tooling.",
   "workspaces": [
     "packages/*"
   ],

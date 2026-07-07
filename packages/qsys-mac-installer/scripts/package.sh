@@ -1,7 +1,7 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Robert Owens
-# package.sh — build, sign, notarize, staple the two-bundle Q-SYS Designer installer + .dmg.
+# package.sh — build, sign, notarize, staple the two-bundle Q-SYS Mac Installer + .dmg.
 #
 # Two bundles ship in one notarized dmg:
 #   • Launcher  "Q-SYS Designer.app"          — DevID-signed + hardened runtime so the installer
@@ -9,7 +9,7 @@
 #                time the installer copies it to /Applications, bakes the user-extracted QSC icon
 #                into Contents/Resources, and ad-hoc re-signs it (Emit.swift) — so the emitted
 #                app is ad-hoc but locally-created (not quarantined → Gatekeeper opens it).
-#   • Installer "Install Q-SYS Designer.app"  — setup UI + recipe Resources (provision.sh, lib,
+#   • Installer "Q-SYS Mac Installer.app"    — setup UI + recipe Resources (provision.sh, lib,
 #                Resources/bin toolchain, Resources/cache Wine+.NET) + the embedded launcher.
 #                Signed inner→outer WITHOUT --deep (so the nested launcher's signature survives),
 #                notarized, stapled, then wrapped in a dmg that's itself signed + notarized.
@@ -41,9 +41,9 @@ TEAM_ID="${TEAM_ID:-7GSPYYN5X8}"
 DIST="${DIST:-$ROOT/dist}"
 BUILD="$APPDIR/app/build"                    # gitignored build output (matches the dev convention)
 LAUNCHER="$BUILD/launcher/Q-SYS Designer.app"
-INSTALLER="$BUILD/installer/Install Q-SYS Designer.app"
-VOL="Install Q-SYS Designer"
-DMG="$DIST/Install Q-SYS Designer.dmg"
+INSTALLER="$BUILD/installer/Q-SYS Mac Installer.app"
+VOL="Q-SYS Mac Installer"
+DMG="$DIST/qsys-mac-installer.dmg"
 
 say()  { printf '\033[1;36m[pkg]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[pkg] WARN:\033[0m %s\n' "$*" >&2; }
@@ -94,10 +94,11 @@ find "$ROOT/lib" -name '*.pyc' -delete 2>/dev/null || true
 say "Generating project + building both targets…"
 xcodegen generate --spec "$APPDIR/project.yml" --project "$APPDIR" >/dev/null
 mkdir -p "$BUILD"
-rm -rf "$BUILD/launcher" "$BUILD/installer"
+rm -rf "$BUILD/launcher" "$BUILD/installer" "$BUILD/DerivedData"
 for t in Launcher Installer; do
   out="$BUILD/$(echo "$t" | tr '[:upper:]' '[:lower:]')"
   xcodebuild -project "$PROJ" -scheme "$t" -configuration Release \
+    -derivedDataPath "$BUILD/DerivedData" \
     CONFIGURATION_BUILD_DIR="$out" CODE_SIGN_IDENTITY="-" build >"$BUILD/$t.log" 2>&1 \
     || { tail -30 "$BUILD/$t.log"; die "$t build failed (see $BUILD/$t.log)."; }
   say "  built $t"

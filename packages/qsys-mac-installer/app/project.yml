@@ -5,7 +5,7 @@
 # TWO app targets (the true-installer model):
 #   • Launcher  → "Q-SYS Designer.app"        — placed in /Applications by the installer; only
 #                 launches the already-provisioned Designer. Minimal: Shared + Launcher sources.
-#   • Installer → "Install Q-SYS Designer.app" — lives on the dmg; setup UI + recipe Resources +
+#   • Installer → "Q-SYS Mac Installer.app" — lives on the dmg; setup UI + recipe Resources +
 #                 the emit step. It provisions, then copies the Launcher into /Applications and
 #                 paints the extracted QSC icon on it.
 # Shared/DataDir.swift compiles into both. package.sh builds Launcher first, notarizes+staples
@@ -77,8 +77,8 @@ targets:
         buildPhase: resources
     settings:
       base:
-        PRODUCT_NAME: "Install Q-SYS Designer"
-        PRODUCT_BUNDLE_IDENTIFIER: com.byo.qsys-designer-installer
+        PRODUCT_NAME: "Q-SYS Mac Installer"
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.reowens.qsys-mac-installer
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Info.plist
         # A6: the installer only spawns wine as a CHILD (which carries its own entitlements), so it

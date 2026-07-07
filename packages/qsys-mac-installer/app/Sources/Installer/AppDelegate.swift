@@ -48,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         host.sizingOptions = []   // we drive the window size ourselves; no AppKit auto-constraints to fight
 
         let window = NSWindow(contentViewController: host)
-        window.title = "Install Q-SYS Designer"
+        window.title = "Q-SYS Mac Installer"
         window.styleMask.remove(.resizable)   // fixed installer window — auto-fit only, no user resize
         // Initial fit before showing so the first paint isn't clipped (viewDidLayout owns it thereafter).
         host.view.layoutSubtreeIfNeeded()
