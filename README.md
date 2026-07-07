@@ -129,7 +129,7 @@ The signed installer source lives in
 [`packages/qsys-mac-installer`](packages/qsys-mac-installer). It provisions Wine +
 .NET into Application Support and gives you a real Dock/Finder/menu-bar citizen.
 The current signed DMG is
-[`qsys-mac-installer 0.1.1`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.1).
+[`qsys-mac-installer 0.1.3`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.3).
 
 Bonus: Designer's **Emulate mode** serves QRC on `127.0.0.1:1710`, so all of the
 tools above work hardware-free against it — that's how this repo's tooling is
