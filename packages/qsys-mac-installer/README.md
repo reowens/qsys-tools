@@ -92,6 +92,11 @@ prebuilt prefix without the `.app` (dev/debug), use `./launch.sh`.
    ::1 <your-hostname>
    ```
 
+### Known visual limitations
+
+- **Drop shadows do not render correctly.** Designer's functional UI works, but WPF drop shadows
+  are a known cosmetic miss under the current Wine/Rosetta path.
+
 ### Opening your files — the `Z:` drive
 
 The prefix is **not** wired to your Mac home. By default Wine symlinks the Windows profile's
