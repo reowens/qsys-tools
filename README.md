@@ -105,7 +105,7 @@ are done. The installed `Q-SYS Designer.app` and its Application Support data re
 Direct DMG path:
 
 ```sh
-open https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.3
+open https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.4
 ```
 
 Or use the npm bootstrapper:
@@ -144,7 +144,7 @@ The signed installer source lives in
 [`packages/qsys-mac-installer`](packages/qsys-mac-installer). It provisions Wine +
 .NET into Application Support and gives you a real Dock/Finder/menu-bar citizen.
 The current signed DMG is
-[`qsys-mac-installer 0.1.3`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.3).
+[`qsys-mac-installer 0.1.4`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.4).
 
 Bonus: Designer's **Emulate mode** serves QRC on `127.0.0.1:1710`, so all of the
 tools above work hardware-free against it — that's how this repo's tooling is

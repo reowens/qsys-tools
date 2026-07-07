@@ -46,7 +46,7 @@ run it once, then trash the installer app when you are done. The installed `Q-SY
 its Application Support data remain.
 
 Direct signed-DMG path: download
-[`qsys-mac-installer.dmg`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.3),
+[`qsys-mac-installer.dmg`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.4),
 open `Q-SYS Mac Installer.app`, and drop your Q-SYS Designer installer into the window.
 
 npm/bootstrapper path:
