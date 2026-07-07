@@ -123,6 +123,9 @@ install Homebrew `msitools`. When updating this bundle:
 - If changing the native MSI assembler, run
   `packages/qsys-mac-installer/scripts/compare-assemble-msi.sh <installer.exe>` and
   verify its manifest comparison passes.
+- If changing the native font renamer, run
+  `packages/qsys-mac-installer/scripts/compare-rename-font-family.sh` and verify all
+  bundled Selawik outputs match the Python helper.
 
 Before building the DMG:
 

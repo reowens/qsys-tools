@@ -38,6 +38,7 @@ RECIPE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 : "${WINE_URL:=https://github.com/Gcenx/macOS_Wine_builds/releases/download/11.10/wine-staging-11.10-osx64.tar.xz}"
 : "${DOTNET_DESKTOP_URL:=https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/8.0.28/windowsdesktop-runtime-8.0.28-win-x64.exe}"
 : "${DOTNET_ASPNET_URL:=https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/8.0.28/aspnetcore-runtime-8.0.28-win-x64.exe}"
+: "${DOTNET_INSTALL_TIMEOUT_SECONDS:=900}"
 
 # SHA-256 of each pinned artifact — checked before we ever extract/run it, on a fresh
 # download AND on the bundled cache (a tampered or swapped cache is rejected too). The two
@@ -86,6 +87,40 @@ verify_sha256() {  # $1 = file  $2 = expected sha256 (hex)  $3 = human label
   got="$(shasum -a 256 "$file" 2>/dev/null | awk '{print $1}')"
   [ -n "$got" ] || die "Couldn't compute the checksum of $label ($file)."
   [ "$got" = "$want" ] || die "$label failed its integrity check — expected SHA-256 $want but got $got. Refusing to use a tampered or wrong file: $file"
+}
+
+run_dotnet_installer() {  # $1 = human label  $2 = installer path
+  local label="$1" installer="$2" timeout="$DOTNET_INSTALL_TIMEOUT_SECONDS" status_file pid elapsed=0 status
+  case "$timeout" in ''|*[!0-9]*) timeout=900 ;; esac
+  [ "$timeout" -gt 0 ] || timeout=900
+
+  status_file="$(mktemp "${TMPDIR:-/tmp}/qsys-dotnet-status.XXXXXX")" || return 1
+  rm -f "$status_file"
+  (
+    set +e
+    WINEDLLOVERRIDES="mscoree,mshtml=" "$WINE" "$installer" /install /quiet /norestart >/dev/null 2>&1
+    printf '%s\n' "$?" >"$status_file"
+  ) &
+  pid=$!
+
+  while [ ! -f "$status_file" ]; do
+    if [ "$elapsed" -ge "$timeout" ]; then
+      warn "$label runtime installer did not exit after ${timeout}s; stopping Wine for this prefix."
+      [ -x "$WINEDIR/bin/wineserver" ] && "$WINEDIR/bin/wineserver" -k >/dev/null 2>&1 || true
+      kill "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      rm -f "$status_file"
+      return 124
+    fi
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+
+  wait "$pid" 2>/dev/null || true
+  status="$(<"$status_file")"
+  rm -f "$status_file"
+  case "$status" in ''|*[!0-9]*) return 1 ;; esac
+  return "$status"
 }
 
 # ----------------------------------------------------------------------------
@@ -217,9 +252,9 @@ install_dotnet() {
   # During the *install* only, disable mscoree+mshtml to skip the wine-mono prompt.
   # (At LAUNCH mscoree must be ON — disabling it breaks the managed loader. See README.)
   say "Installing .NET 8 Desktop runtime (silent)…"
-  WINEDLLOVERRIDES="mscoree,mshtml=" "$WINE" "$desktop" /install /quiet /norestart >/dev/null 2>&1 || warn "Desktop runtime installer returned nonzero."
+  run_dotnet_installer "Desktop" "$desktop" || warn "Desktop runtime installer returned nonzero."
   say "Installing ASP.NET Core 8 runtime (silent)…"
-  WINEDLLOVERRIDES="mscoree,mshtml=" "$WINE" "$aspnet"  /install /quiet /norestart >/dev/null 2>&1 || warn "ASP.NET runtime installer returned nonzero."
+  run_dotnet_installer "ASP.NET" "$aspnet" || warn "ASP.NET runtime installer returned nonzero."
   # Both installers exit nonzero under Wine even on success, so their exit code can't gate this —
   # assert the runtime actually LANDED. The .NET installer must create a window; a headless run with
   # no GUI session (Wine's winemac.drv can't reach the macOS Aqua session → nodrv_CreateWindow)
@@ -386,10 +421,22 @@ apply_prefix_tweaks() {
     say "Installing the Segoe UI shim (Selawik, renamed locally — heals bug 59925 hyphen tofu)…"
     local fdir="$WINEPREFIX/drive_c/windows/Fonts"
     mkdir -p "$fdir"
+    local font_helper="" use_native_font_helper=0
+    if [ -n "${QSYS_RENAME_FONT_FAMILY:-}" ] || [ "${QSYS_NATIVE_HELPERS:-0}" = "1" ]; then
+      font_helper="${QSYS_RENAME_FONT_FAMILY:-}"
+      if [ -z "$font_helper" ]; then font_helper="$(command -v qsys-rename-font-family 2>/dev/null || true)"; fi
+      [ -n "$font_helper" ] && [ -x "$font_helper" ] || die "native font renamer requested but not found. Run scripts/bundle-deps.sh and ensure Resources/bin is first in PATH, or set QSYS_RENAME_FONT_FAMILY."
+      use_native_font_helper=1
+    fi
     while IFS=: read -r src regname out; do
-      python3 "$RECIPE_DIR/rename-font-family.py" \
-        "$fonts_src/$src.ttf" "$fdir/$out.ttf" "Selawik" "Segoe UI" >/dev/null 2>&1 \
-        || { warn "Segoe UI shim: rename failed for $src.ttf"; continue; }
+      if [ "$use_native_font_helper" -eq 1 ]; then
+        "$font_helper" "$fonts_src/$src.ttf" "$fdir/$out.ttf" "Selawik" "Segoe UI" >/dev/null 2>&1 \
+          || { warn "Segoe UI shim: native rename failed for $src.ttf"; continue; }
+      else
+        python3 "$RECIPE_DIR/rename-font-family.py" \
+          "$fonts_src/$src.ttf" "$fdir/$out.ttf" "Selawik" "Segoe UI" >/dev/null 2>&1 \
+          || { warn "Segoe UI shim: rename failed for $src.ttf"; continue; }
+      fi
       "$WINE" reg add 'HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts' \
         /v "$regname" /t REG_SZ /d "$out.ttf" /f >/dev/null 2>&1 \
         || warn "Segoe UI shim: could not register '$regname'."

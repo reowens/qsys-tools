@@ -148,13 +148,16 @@ errors with partial-state cleanup + resume.
 
 ### Native assembler derisk path
 
-`scripts/bundle-deps.sh` also builds `Resources/bin/qsys-assemble-msi`, a native Swift port of
-`lib/assemble-msi.py`. It is opt-in for now: set `QSYS_NATIVE_HELPERS=1` or
-`QSYS_ASSEMBLE_MSI=/path/to/qsys-assemble-msi` to use it. The default remains Python until the
-native path has more install coverage. Validate parity with:
+`scripts/bundle-deps.sh` also builds native Swift ports of the remaining runtime Python helpers:
+`Resources/bin/qsys-assemble-msi` for `lib/assemble-msi.py` and
+`Resources/bin/qsys-rename-font-family` for `lib/rename-font-family.py`. They are opt-in for now:
+set `QSYS_NATIVE_HELPERS=1`, `QSYS_ASSEMBLE_MSI=/path/to/qsys-assemble-msi`, or
+`QSYS_RENAME_FONT_FAMILY=/path/to/qsys-rename-font-family` to use them. The default remains Python
+until the native path has more install coverage. Validate parity with:
 
 ```sh
 scripts/compare-assemble-msi.sh "/path/to/Q-SYS Designer Installer 10.4.0.exe"
+scripts/compare-rename-font-family.sh
 ```
 
 ## Distribution — signed & notarized `.dmg`
@@ -363,3 +366,8 @@ WINE_APP="/path/to/Wine Staging.app" ./build.sh --installer ...   # reuse a loca
 
 .NET 8 runtimes: <https://dotnet.microsoft.com/download/dotnet/8.0> (need **x64**,
 WindowsDesktop **and** ASP.NET Core).
+
+The silent .NET installers run under Wine and can occasionally stall before returning. The recipe
+now bounds each runtime installer with `DOTNET_INSTALL_TIMEOUT_SECONDS` (default `900`) and stops
+Wine for that prefix on timeout so setup fails cleanly instead of hanging forever. Increase it only
+for unusually slow machines or while debugging a Wine/.NET install issue.

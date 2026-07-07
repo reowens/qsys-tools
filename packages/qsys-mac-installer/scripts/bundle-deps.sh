@@ -172,6 +172,10 @@ say "helper ← qsys-assemble-msi (native)"
 swiftc -O -o "$BIN/qsys-assemble-msi" "$RECIPE_DIR/assemble-msi.swift"
 codesign --force -s - "$BIN/qsys-assemble-msi" >/dev/null 2>&1 || true
 
+say "helper ← qsys-rename-font-family (native)"
+swiftc -O -o "$BIN/qsys-rename-font-family" "$RECIPE_DIR/rename-font-family.swift"
+codesign --force -s - "$BIN/qsys-rename-font-family" >/dev/null 2>&1 || true
+
 # ----------------------------------------------------------------------------
 # 4. Pre-compile the in-process shims (universal: arm64 native + the x86_64 slice
 #    Wine needs under Rosetta). End-user machines have no clang.
