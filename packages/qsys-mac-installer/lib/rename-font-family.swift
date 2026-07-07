@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Robert Owens
 // Native companion to rename-font-family.py. It preserves the Python renamer's
-// sfnt/name-table rebuild behavior so we can compare byte-for-byte before
-// removing the python3 prerequisite.
+// sfnt/name-table rebuild behavior so that script can remain a developer-only
+// parity oracle.
 
 import Foundation
 

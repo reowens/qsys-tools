@@ -3,22 +3,20 @@
 // EnvChecks — pre-provision environment advisories shown in the first-run setup UI.
 //
 // Detect setup blockers/advisories before the user drops their installer: Rosetta for the
-// x86_64 Wine stack, python3 for MSI layout assembly, and Little Snitch loopback
-// blocking. Shown only in the .idle setup state, so it's inherently one-time — no persistence
-// needed. Zero QSC code.
+// x86_64 Wine stack and Little Snitch loopback blocking. Shown only in the .idle setup state,
+// so it's inherently one-time — no persistence needed. Zero QSC code.
 
 import Foundation
 
 struct EnvNotice: Identifiable {
     enum Kind { case blocker, advisory }
-    enum Action: Equatable { case none, installRosetta, recheck }
+    enum Action: Equatable { case none, installRosetta }
     let id = UUID()
     let kind: Kind
     let title: String
     let detail: String
 
-    // Rosetta can be installed in-app; external tool blockers can only be re-checked after
-    // the user installs them with Homebrew/CLT.
+    // Rosetta can be installed in-app; blockers always also show Re-check.
     let action: Action
 
     init(kind: Kind, title: String, detail: String, action: Action = .none) {
@@ -30,10 +28,6 @@ struct EnvNotice: Identifiable {
 }
 
 enum EnvChecks {
-    private static let provisionPathDirs = [
-        "/usr/bin", "/bin", "/usr/sbin", "/sbin", "/opt/homebrew/bin", "/usr/local/bin"
-    ]
-
     /// Apple Silicon needs Rosetta 2 to run the x86_64 Wine stack (provisioning *and* launch).
     /// Intel runs x86_64 natively → never a blocker. Probe by actually exec'ing an x86_64
     /// binary under Rosetta; a non-zero exit (or a throw) means Rosetta is absent.
@@ -64,23 +58,6 @@ enum EnvChecks {
             || fm.fileExists(atPath: "/Library/Little Snitch")
     }
 
-    static var python3Missing: Bool {
-        if ProcessInfo.processInfo.environment["QSYS_FORCE_PYTHON3_MISSING"] == "1" { return true }
-        return !commandExists("python3")
-    }
-
-    private static func commandExists(_ name: String) -> Bool {
-        let fm = FileManager.default
-        let envPath = ProcessInfo.processInfo.environment["PATH"]?
-            .split(separator: ":")
-            .map(String.init) ?? []
-        var seen = Set<String>()
-        for dir in provisionPathDirs + envPath where seen.insert(dir).inserted {
-            if fm.isExecutableFile(atPath: "\(dir)/\(name)") { return true }
-        }
-        return false
-    }
-
     /// Resolve the live notices. Spawns a subprocess (the Rosetta probe) — call once, off the
     /// render path (the view caches the result).
     static var notices: [EnvNotice] {
@@ -91,13 +68,6 @@ enum EnvChecks {
                 title: "Rosetta 2 required",
                 detail: "Q-SYS Designer runs x86_64 Wine under Rosetta 2, which isn’t installed yet. Install it to continue.",
                 action: .installRosetta))
-        }
-        if python3Missing {
-            out.append(EnvNotice(
-                kind: .blocker,
-                title: "python3 required",
-                detail: "Setup uses local Python scripts to assemble the app layout. Install Xcode Command Line Tools (xcode-select --install) or Homebrew Python (brew install python), then Re-check.",
-                action: .recheck))
         }
         if littleSnitchPresent {
             out.append(EnvNotice(

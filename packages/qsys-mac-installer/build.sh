@@ -16,6 +16,13 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Direct source runs should find the bundled/native helpers after scripts/bundle-deps.sh without
+# requiring the caller to edit PATH. The packaged GUI supplies its own security-ordered PATH.
+for d in "$HERE/bin" "$HERE/app/Resources/bin"; do
+  [ -d "$d" ] && PATH="$d:$PATH"
+done
+export PATH
+
 INSTALLER=""; SKIP_DOTNET=0
 while [ $# -gt 0 ]; do
   case "$1" in

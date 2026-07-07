@@ -42,9 +42,8 @@ final class Provisioner: ObservableObject {
         proc.arguments = ["\(resources)/provision.sh", installer]
         var env = ProcessInfo.processInfo.environment
         env["WRAP_HOME"] = DataDir.root
-        // Tier B (Phase 3): point the recipe at bundled deps so first-run avoids Wine/.NET
-        // downloads and uses our 7z/icoutils/msiinfo binaries. python3 still comes from
-        // host prerequisites until those assembly pieces are bundled too.
+        // Point the recipe at bundled deps so first-run avoids Wine/.NET downloads and uses
+        // our 7z/icoutils/msiinfo/native-helper binaries instead of host package-manager tools.
         let bin = "\(resources)/bin"
         env["CACHE"] = "\(resources)/cache"                       // Wine tarball + .NET installers (offline)
         env["QSYS_PREBUILT_APPMENU"] = "\(bin)/appmenu.dylib"     // pre-compiled (no clang)

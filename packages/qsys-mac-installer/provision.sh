@@ -27,6 +27,13 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALLER="${1:?usage: provision.sh <path to your Q-SYS Designer Installer*.exe>}"
 
+# Direct CLI runs should find bundled/native helpers without a manual PATH edit. The native GUI
+# still supplies a security-ordered PATH explicitly.
+for d in "$HERE/bin" "$HERE/app/Resources/bin"; do
+  [ -d "$d" ] && PATH="$d:$PATH"
+done
+export PATH
+
 # shellcheck source=lib/recipe.sh
 source "$HERE/lib/recipe.sh"
 

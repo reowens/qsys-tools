@@ -123,6 +123,18 @@ run_dotnet_installer() {  # $1 = human label  $2 = installer path
   return "$status"
 }
 
+native_helper_path() {  # $1 = override env var name  $2 = command name
+  local override="${!1:-}" helper
+  if [ -n "$override" ]; then
+    [ -x "$override" ] || return 1
+    printf '%s\n' "$override"
+    return 0
+  fi
+  helper="$(command -v "$2" 2>/dev/null || true)"
+  [ -n "$helper" ] && [ -x "$helper" ] || return 1
+  printf '%s\n' "$helper"
+}
+
 # ----------------------------------------------------------------------------
 # Preflight
 # ----------------------------------------------------------------------------
@@ -131,7 +143,14 @@ preflight() {
   [ "$(uname -m)" = "arm64" ]  || warn "Not Apple Silicon — the recipe was proven on arm64 + Rosetta 2 only."
   command -v 7z   >/dev/null 2>&1 || die "p7zip missing. Install:  brew install p7zip"
   command -v msiinfo >/dev/null 2>&1 || die "msiinfo missing. Packaged installers should include it in Resources/bin; source builds can install it with: brew install msitools"
-  command -v python3 >/dev/null 2>&1 || die "python3 missing (maps the installer payload to the app layout). Install the Xcode Command Line Tools:  xcode-select --install"
+  if [ "${QSYS_USE_PYTHON_HELPERS:-0}" = "1" ]; then
+    command -v python3 >/dev/null 2>&1 || die "QSYS_USE_PYTHON_HELPERS=1 was set, but python3 is missing. Install Python or unset QSYS_USE_PYTHON_HELPERS to use the bundled native helpers."
+  else
+    native_helper_path QSYS_ASSEMBLE_MSI qsys-assemble-msi >/dev/null \
+      || die "native MSI assembler missing. Packaged installers include it in Resources/bin; source builds should run scripts/bundle-deps.sh or set QSYS_ASSEMBLE_MSI."
+    native_helper_path QSYS_RENAME_FONT_FAMILY qsys-rename-font-family >/dev/null \
+      || die "native font renamer missing. Packaged installers include it in Resources/bin; source builds should run scripts/bundle-deps.sh or set QSYS_RENAME_FONT_FAMILY."
+  fi
   command -v curl >/dev/null 2>&1 || die "curl missing."
   command -v wrestool >/dev/null 2>&1 || warn "icoutils missing (brew install icoutils) — the app will use a generic icon."
   /usr/bin/pgrep -q oahd 2>/dev/null || warn "Rosetta 2 may not be installed. Install:  softwareupdate --install-rosetta --agree-to-license"
@@ -360,9 +379,9 @@ cleanup_extract() {
 # 326 .luax component defs, 28 .qplug plugins, symbols and the full DLL set — instead of the
 # old content-marker hand-pick that shipped ~40% and dropped the entire component layer (which
 # NRE'd the LCQ-LN inventory drag and boxed the missing-symbol components). msiinfo reads the
-# tables; assemble-msi.py does the path math (shell joins choke on the mangled identifiers).
-# A native helper can be opted into with QSYS_NATIVE_HELPERS=1 or QSYS_ASSEMBLE_MSI=/path/to/helper;
-# Python stays default until native output is proven byte-identical across clean installs.
+# tables; qsys-assemble-msi does the path math (shell joins choke on the mangled identifiers).
+# Python remains only as an explicit developer fallback for parity/debug runs:
+# QSYS_USE_PYTHON_HELPERS=1.
 assemble() {
   APP="$WINEPREFIX/drive_c/$APP_SUBDIR"
   mkdir -p "$APP"
@@ -370,13 +389,13 @@ assemble() {
   [ -n "$msi" ] && [ -f "$msi" ] || die "Installer MSI not found under $EXTRACT — can't map the app layout."
   say "Mapping the complete app from the installer MSI…"
   # $EXTRACT is the source root: the MSI source chain begins with the literal OFFLINE segment.
-  if [ -n "${QSYS_ASSEMBLE_MSI:-}" ] || [ "${QSYS_NATIVE_HELPERS:-0}" = "1" ]; then
-    local helper="${QSYS_ASSEMBLE_MSI:-}"
-    if [ -z "$helper" ]; then helper="$(command -v qsys-assemble-msi 2>/dev/null || true)"; fi
-    [ -n "$helper" ] && [ -x "$helper" ] || die "native MSI assembler requested but not found. Run scripts/bundle-deps.sh and ensure Resources/bin is first in PATH, or set QSYS_ASSEMBLE_MSI."
-    "$helper" "$msi" "$EXTRACT" "$APP" || die "native MSI-mapped assembly failed (see the error above)."
-  else
+  if [ "${QSYS_USE_PYTHON_HELPERS:-0}" = "1" ]; then
+    command -v python3 >/dev/null 2>&1 || die "python3 missing but QSYS_USE_PYTHON_HELPERS=1 was set."
     python3 "$RECIPE_DIR/assemble-msi.py" "$msi" "$EXTRACT" "$APP" || die "MSI-mapped assembly failed (see the error above)."
+  else
+    local helper; helper="$(native_helper_path QSYS_ASSEMBLE_MSI qsys-assemble-msi)" \
+      || die "native MSI assembler not found. Run scripts/bundle-deps.sh and ensure Resources/bin is first in PATH, or set QSYS_ASSEMBLE_MSI."
+    "$helper" "$msi" "$EXTRACT" "$APP" || die "native MSI-mapped assembly failed (see the error above)."
   fi
 }
 
@@ -421,21 +440,20 @@ apply_prefix_tweaks() {
     say "Installing the Segoe UI shim (Selawik, renamed locally — heals bug 59925 hyphen tofu)…"
     local fdir="$WINEPREFIX/drive_c/windows/Fonts"
     mkdir -p "$fdir"
-    local font_helper="" use_native_font_helper=0
-    if [ -n "${QSYS_RENAME_FONT_FAMILY:-}" ] || [ "${QSYS_NATIVE_HELPERS:-0}" = "1" ]; then
-      font_helper="${QSYS_RENAME_FONT_FAMILY:-}"
-      if [ -z "$font_helper" ]; then font_helper="$(command -v qsys-rename-font-family 2>/dev/null || true)"; fi
-      [ -n "$font_helper" ] && [ -x "$font_helper" ] || die "native font renamer requested but not found. Run scripts/bundle-deps.sh and ensure Resources/bin is first in PATH, or set QSYS_RENAME_FONT_FAMILY."
-      use_native_font_helper=1
+    local font_helper=""
+    if [ "${QSYS_USE_PYTHON_HELPERS:-0}" != "1" ]; then
+      font_helper="$(native_helper_path QSYS_RENAME_FONT_FAMILY qsys-rename-font-family)" \
+        || die "native font renamer not found. Run scripts/bundle-deps.sh and ensure Resources/bin is first in PATH, or set QSYS_RENAME_FONT_FAMILY."
     fi
     while IFS=: read -r src regname out; do
-      if [ "$use_native_font_helper" -eq 1 ]; then
-        "$font_helper" "$fonts_src/$src.ttf" "$fdir/$out.ttf" "Selawik" "Segoe UI" >/dev/null 2>&1 \
-          || { warn "Segoe UI shim: native rename failed for $src.ttf"; continue; }
-      else
+      if [ "${QSYS_USE_PYTHON_HELPERS:-0}" = "1" ]; then
+        command -v python3 >/dev/null 2>&1 || die "python3 missing but QSYS_USE_PYTHON_HELPERS=1 was set."
         python3 "$RECIPE_DIR/rename-font-family.py" \
           "$fonts_src/$src.ttf" "$fdir/$out.ttf" "Selawik" "Segoe UI" >/dev/null 2>&1 \
           || { warn "Segoe UI shim: rename failed for $src.ttf"; continue; }
+      else
+        "$font_helper" "$fonts_src/$src.ttf" "$fdir/$out.ttf" "Selawik" "Segoe UI" >/dev/null 2>&1 \
+          || { warn "Segoe UI shim: native rename failed for $src.ttf"; continue; }
       fi
       "$WINE" reg add 'HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts' \
         /v "$regname" /t REG_SZ /d "$out.ttf" /f >/dev/null 2>&1 \
@@ -480,14 +498,15 @@ check_hosts() {
 # (and the Quit/Hide items) ONCE at init from the main bundle's CFBundleName; for
 # Wine's loose loader that comes from its embedded plist (ships "Wine"). Menu-item
 # titles, the process name, and an on-disk adjacent Info.plist do NOT reliably win
-# (all tried). delegates the byte surgery to patch-loader-plist.py, then re-signs the
-# loader so the edit is sealed. Needs python3 + otool (CLT); skips with a warning if
+# (all tried). The packaged installer uses a pre-patched loader; source-only fallback
+# delegates the byte surgery to patch-loader-plist.py, then re-signs the loader so the
+# edit is sealed. That fallback needs python3 + otool (CLT) and skips with a warning if
 # absent (menu cosmetically reads "wine"). Arg $1 = a Wine root.
 patch_loader_bundle_name() {
   local wineroot="$1"
   local loader="$wineroot/lib/wine/x86_64-unix/wine"
   [ -f "$loader" ] || return 0
-  # Tier-B fast path: a loader pre-patched at app-build time (end-user machines have no
+  # Tier-B fast path: a loader pre-patched at app-build time (end-user machines need no
   # python3/otool). The bundled tarball is pinned, so its loader bytes are deterministic →
   # the build-time patched copy is byte-correct for the freshly-extracted loader. Drop it
   # in + re-sign (codesign ships with macOS; otool/python3 do not).
