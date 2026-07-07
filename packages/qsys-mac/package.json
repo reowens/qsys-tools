@@ -1,6 +1,6 @@
 {
   "name": "qsys-mac",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "npm bootstrapper for the signed Q-SYS Mac Installer DMG.",
   "type": "module",
   "bin": {
