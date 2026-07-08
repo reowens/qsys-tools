@@ -99,8 +99,9 @@ covered by typed helpers — see [`packages/qsys-qrc`](packages/qsys-qrc).
 
 ## Q-SYS Designer on your Mac
 
-For most users, use the signed DMG installer app, run it once, then trash the installer app when you
-are done. The installed `Q-SYS Designer.app` and its Application Support data remain.
+For most users, use the signed DMG installer app. Run it once to create `Q-SYS Designer.app`, then
+either trash the installer app or keep it around as a small manager for Launch, Reinstall, and Remove.
+The installed Designer app and its Application Support data remain independent of the installer app.
 
 Direct DMG path:
 
@@ -119,7 +120,7 @@ the bundled helper. The npm package does not contain Q-SYS Designer or the app
 payload. You provide **your own** free Designer installer download (BYO — nothing
 of QSC's is redistributed).
 
-For support diagnostics, run:
+For read-only support diagnostics, run:
 
 ```sh
 npx qsys-mac doctor

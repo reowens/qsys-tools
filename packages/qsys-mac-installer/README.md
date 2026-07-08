@@ -42,12 +42,15 @@ Homebrew p7zip/icoutils/msitools or host `python3`. Source-only development that
 ## Usage
 
 Recommended for most users: download the signed DMG, open it, drag/copy `Q-SYS Mac Installer.app`,
-run it once, then trash the installer app when you are done. The installed `Q-SYS Designer.app` and
-its Application Support data remain.
+and run it once to create `Q-SYS Designer.app`. After Designer is installed, the installer app shows
+Launch, Reinstall, and Remove actions; you can keep it around as a small manager or trash it when
+you are done. The installed Designer app and its Application Support data remain independent of the
+installer app.
 
 Direct signed-DMG path: download
 [`qsys-mac-installer.dmg`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.4),
-open `Q-SYS Mac Installer.app`, and drop your Q-SYS Designer installer into the window.
+open `Q-SYS Mac Installer.app`, and drop your Q-SYS Designer installer into the window for a fresh
+install or explicit reinstall.
 
 npm/bootstrapper path:
 
