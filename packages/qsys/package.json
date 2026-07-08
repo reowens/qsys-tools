@@ -19,7 +19,7 @@
     "postbuild": "node -e \"require('fs').chmodSync('dist/bin.js', 0o755)\"",
     "prepack": "npm run build",
     "qsys": "tsx src/bin.ts --",
-    "test": "node ../../scripts/run-if-emulator.mjs \"tsx test/cli.ts\""
+    "test": "tsx test/cli.ts"
   },
   "files": [
     "dist",
@@ -56,5 +56,8 @@
   ],
   "dependencies": {
     "qsys-qrc": "^0.2.0"
+  },
+  "devDependencies": {
+    "qsys-mock-core": "^0.1.0"
   }
 }

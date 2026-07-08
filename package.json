@@ -11,7 +11,6 @@
     "qsys-mac": "tsx packages/qsys-mac/src/bin.ts",
     "build": "npm run build --workspace=qsys-qrc && npm run build --workspace=qsys-cli --workspace=qsys-mcp --workspace=qsys-mac",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "typecheck:full": "tsc -p tsconfig.e2e.json --noEmit",
     "test": "npm run --workspaces --if-present test"
   },
   "devDependencies": {

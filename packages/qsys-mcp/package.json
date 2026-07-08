@@ -14,7 +14,7 @@
     "prepack": "npm run build",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
-    "test": "node ../../scripts/run-if-emulator.mjs \"tsx test/integration.ts && tsx test/mcp-mock.ts && tsx test/reconnect.ts\"",
+    "test": "tsx test/integration.ts && tsx test/mcp-mock.ts && tsx test/reconnect.ts",
     "test:mcp": "tsx test/mcp-mock.ts",
     "test:reconnect": "tsx test/reconnect.ts",
     "smoke": "tsx test/live-smoke.ts",
@@ -64,6 +64,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.5.0",
+    "qsys-mock-core": "^0.1.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   }
