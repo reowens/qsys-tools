@@ -6,6 +6,15 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-08
+
+### Changed
+
+- No functional changes. First release published from CI via **trusted publishing
+  (OIDC, tokenless)** with **build provenance** — validates the tag-driven
+  `.github/workflows/publish.yml` pipeline. (Earlier versions were published
+  manually and do not carry provenance, despite prior changelog wording.)
+
 ## [0.2.0] - 2026-07-08
 
 ### Added
