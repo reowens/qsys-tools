@@ -22,40 +22,39 @@ instead of rendered Markdown line breaks.
 
 ## Npm Packages
 
-This is a **pnpm workspace**. Internal deps use the `workspace:^` protocol, which
-**pnpm rewrites to a real version at publish time** — so publish with `pnpm publish`,
-**not** `npm publish` (npm cannot resolve `workspace:`). `qsys-mock-core` is
-`private` and is never published.
+Publishing is **tag-driven via GitHub Actions trusted publishing (OIDC)** — no
+`NPM_TOKEN`, no local OTP, and npm attaches build provenance automatically (public
+repo + public packages). See `.github/workflows/publish.yml`.
 
-Publish in dependency order (each `--filter` builds via `prepack` and rewrites its
-`workspace:^` dep on qsys-qrc):
+**One-time setup (per package, on npmjs.com):** for each of `qsys-qrc`, `qsys-cli`,
+`qsys-mcp`, `qsys-mac`, open `npmjs.com/package/<name>/access` → **Trusted Publishers**
+→ add a **GitHub Actions** publisher: organization/user `reowens`, repository
+`qsys-tools`, workflow filename `publish.yml`. (Optionally set the package's publishing
+access to "Require two-factor authentication and disallow tokens" — OIDC still works.)
+`qsys-mock-core` is `private` and is never published.
 
-```sh
-pnpm --filter qsys-qrc publish --access public
-pnpm --filter qsys-cli publish --access public
-pnpm --filter qsys-mcp publish --access public
-pnpm --filter qsys-mac publish --access public
-```
-
-If npm asks for 2FA, pass the current OTP (and `--no-git-checks` if publishing from a
-non-release working state):
+To release a package, push its per-package tag — the workflow packs it with pnpm
+(which rewrites `workspace:^` → a real range) and publishes the tarball with OIDC +
+provenance:
 
 ```sh
-pnpm --filter <package> publish --access public --otp="$OTP"
-```
-
-Before publishing:
-
-```sh
+# pre-flight (local)
 pnpm run typecheck
 pnpm test
-pnpm --filter qsys-qrc pack   # inspect the tarball; confirm workspace:^ became a real range
-pnpm --filter qsys-cli pack
-pnpm --filter qsys-mcp pack
-pnpm --filter qsys-mac pack
+pnpm --filter qsys-qrc pack   # inspect: confirm workspace:^ became a real range
+
+# release (publish qsys-qrc before its dependents so their ^range resolves)
+git tag qsys-qrc-v0.2.1 && git push origin qsys-qrc-v0.2.1
 ```
 
-After publishing, verify:
+**Manual fallback** (if CI publishing is unavailable — publishes locally, no
+provenance, requires an npm login + OTP):
+
+```sh
+pnpm --filter <package> publish --access public --otp="$OTP" --no-git-checks
+```
+
+After publishing, verify (provenance badge on npmjs.com; version live):
 
 ```sh
 npm view qsys-qrc version
