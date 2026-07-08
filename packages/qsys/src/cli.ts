@@ -283,7 +283,8 @@ async function watch(
 
   // First poll returns current values — the baseline before the stream starts.
   for (const c of (await client.changeGroupPoll(id)).Changes) emit(c);
-  await client.send('ChangeGroup.AutoPoll', { Id: id, Rate: interval });
+  // Wrapper (not a raw send) so the AutoPoll is re-armed if the socket reconnects.
+  await client.changeGroupAutoPoll(id, interval);
 
   const onNotification = (msg: { method?: string; params?: { Id?: string; Changes?: ControlRow[] } }) => {
     if (msg.method !== 'ChangeGroup.Poll' || msg.params?.Id !== id) return;

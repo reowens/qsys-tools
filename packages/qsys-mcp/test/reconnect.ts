@@ -6,7 +6,8 @@ import { QrcClient } from 'qsys-qrc';
 /**
  * Transparent auto-reconnect, offline against the mock QRC server. Covers:
  *  1. Replay after a Core-restart (state wiped): logon + named-control group +
- *     component-control group are all re-established on the fresh socket.
+ *     component-control group are all re-established on the fresh socket, and a
+ *     group's AutoPoll is re-armed so a `watch` stream survives the drop.
  *  2. Send-driven recovery — a tool call alone drives the reconnect.
  *  3. `reconnect: false` opt-out — stays down after a drop.
  *  4. A timeout (socket still up) must NOT trigger a reconnect.
@@ -79,6 +80,30 @@ async function main(): Promise<void> {
     (await client.changeGroupPoll('cgc')).Changes.find((c) => c.Name === 'gain'),
     'component-control group replayed (poll works on the fresh server)',
   );
+
+  // 1b) AutoPoll is re-armed on reconnect — a `watch` stream keeps pushing after a
+  // drop. The emulator clears autopolls on dropConnections(), so a push arriving
+  // post-reconnect is only possible if the client replayed the AutoPoll.
+  await client.changeGroupAutoPoll('cg1', 0.05);
+  const autoPushed = new Promise<void>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('no AutoPoll push after reconnect')), 4000);
+    t.unref?.();
+    client.on('notification', function onNote(msg: { method?: string; params?: { Id?: string; Changes?: { Name: string; Value: unknown }[] } }) {
+      if (msg.method !== 'ChangeGroup.Poll' || msg.params?.Id !== 'cg1') return;
+      if (msg.params.Changes?.some((c) => c.Name === 'MainGain' && c.Value === -3)) {
+        clearTimeout(t);
+        client.off('notification', onNote);
+        resolve();
+      }
+    });
+  });
+  const reArmed = once(client, 'reconnected', 5000);
+  mock.resetState();        // server forgets cg1 (controls + autopoll)
+  mock.dropConnections();   // socket drops; emulator clears its autopolls
+  await reArmed;
+  await client.setControl('MainGain', -3); // a change the re-armed AutoPoll must push
+  await autoPushed;
+  await client.changeGroupDestroy('cg1'); // stop the AutoPoll so later cases stay quiet
 
   // 2) Transparent send-driven recovery: a tool call alone drives the reconnect.
   mock.resetState();
@@ -156,7 +181,7 @@ async function main(): Promise<void> {
   await closing;
 
   clearTimeout(watchdog);
-  console.log('PASS: auto-reconnect (logon+named+component replay, send-driven, opt-out, timeout≠drop, give-up+re-trigger)');
+  console.log('PASS: auto-reconnect (logon+named+component+autopoll replay, send-driven, opt-out, timeout≠drop, give-up+re-trigger)');
 }
 
 main().catch((e) => {

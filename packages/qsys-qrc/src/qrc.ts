@@ -32,6 +32,8 @@ interface Pending {
 interface ChangeGroupState {
   controls: Set<string>;
   components: Map<string, Set<string>>;
+  /** AutoPoll rate (seconds) if the group is auto-polling; re-armed on reconnect. */
+  autoPollRate?: number;
 }
 
 export class QrcError extends Error {
@@ -289,6 +291,11 @@ export class QrcClient extends EventEmitter {
           });
         }
       }
+      // Re-arm AutoPoll last, once the group's controls exist on the fresh socket,
+      // so a `watch` stream keeps receiving pushes across a reconnect.
+      if (g.autoPollRate != null) {
+        await this.sendOnce('ChangeGroup.AutoPoll', { Id: id, Rate: g.autoPollRate });
+      }
     }
   }
 
@@ -389,6 +396,17 @@ export class QrcClient extends EventEmitter {
 
   changeGroupPoll(id: string): Promise<{ Id: string; Changes: QrcControl[] }> {
     return this.send('ChangeGroup.Poll', { Id: id }) as Promise<{ Id: string; Changes: QrcControl[] }>;
+  }
+
+  /**
+   * Have the Core auto-poll the group and push `ChangeGroup.Poll` notifications
+   * at `rate` seconds. Remembered so an auto-reconnect re-arms it — otherwise a
+   * dropped socket silently ends the stream.
+   */
+  async changeGroupAutoPoll(id: string, rate: number): Promise<unknown> {
+    const result = await this.send('ChangeGroup.AutoPoll', { Id: id, Rate: rate });
+    this.groupState(id).autoPollRate = rate;
+    return result;
   }
 
   async changeGroupRemove(id: string, controls: string[]): Promise<unknown> {

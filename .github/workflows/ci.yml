@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: node ${{ matrix.node }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      # Lean matrix: Node 18/20/22 (the supported range) on Linux, plus one
+      # macOS job for the Mac-focused qsys-mac tooling. No Windows — qsys-mac is
+      # macOS-only and the rest is portable pure-JS, so it'd add cost without
+      # meaningful coverage.
+      matrix:
+        include:
+          - { os: ubuntu-latest, node: 18 }
+          - { os: ubuntu-latest, node: 20 }
+          - { os: ubuntu-latest, node: 22 }
+          - { os: macos-latest, node: 20 }
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # `npm ci` runs each workspace's `prepare` (build), so this also verifies
+      # every package compiles to dist. Internal deps resolve to the workspace
+      # copies, so no unpublished version is fetched from the registry.
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      # The emulator-backed e2e suites auto-skip without the private qsys-emulator
+      # package (see scripts/run-if-emulator.mjs); the qsys-mac unit tests run
+      # everywhere. Typecheck above is the primary hardware-free gate.
+      - run: npm test

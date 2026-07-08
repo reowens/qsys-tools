@@ -1,0 +1,41 @@
+# Changelog
+
+All notable changes to qsys-cli are documented here.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
+this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.1.2] - 2026-07-08
+
+### Fixed
+
+- `qsys watch` now keeps streaming across an auto-reconnect. It arms the change
+  group's AutoPoll through the new `qsys-qrc` `changeGroupAutoPoll` wrapper
+  instead of a raw `send`, so the poll is re-armed after a dropped socket — a
+  Core restart / Emulate-mode toggle no longer silently ends the stream.
+
+### Changed
+
+- Requires `qsys-qrc` ^0.2.0 (for the AutoPoll reconnect fix above).
+
+## [0.1.1] - 2026-07-06
+
+### Changed
+
+- No functional changes. Patch release cut through the trusted-publishing
+  pipeline alongside the rest of the qsys-tools family.
+
+## [0.1.0] - 2026-07-05
+
+### Added
+
+- Initial release: the `qsys` CLI — engine/design status, component and control
+  inventory, get/set for Named Controls and component controls (with ramps),
+  live `watch` streaming via change groups, and snapshot load/save. Human-readable
+  tables by default; `--json` on every command (`watch` emits JSON lines).
+
+[Unreleased]: https://github.com/reowens/qsys-tools/tree/main/packages/qsys
+[0.1.2]: https://www.npmjs.com/package/qsys-cli/v/0.1.2
+[0.1.1]: https://www.npmjs.com/package/qsys-cli/v/0.1.1
+[0.1.0]: https://www.npmjs.com/package/qsys-cli/v/0.1.0
