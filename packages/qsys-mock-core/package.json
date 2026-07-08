@@ -1,0 +1,20 @@
+{
+  "name": "qsys-mock-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal, design-driven Q-SYS Core mock — serves the QRC control plane (status, controls, components, change groups incl. AutoPoll, snapshots) against an in-memory design, with no hardware. The hardware-free test backend for the qsys-tools e2e suites.",
+  "license": "MIT",
+  "keywords": ["q-sys", "qsys", "qsc", "qrc", "mock", "emulator", "test", "av"],
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "qsys-qrc": "^0.2.0"
+  }
+}

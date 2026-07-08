@@ -1,19 +1,17 @@
 /**
- * Test fixture riding the real emulator engine (Phase 4 of qsys-emulator):
- * startMockQrc is a thin wrapper over startEmulator(TEST_DESIGN), so the mock
- * and the emulator can never drift apart. Same wire format, same test hooks
- * (dropConnections / swallowNext / resetState / spies) — the emulator handle
- * was built to cover them.
+ * Test fixture backed by qsys-mock-core: startMockQrc is a thin wrapper over
+ * startMockCore(TEST_DESIGN), the in-repo Q-SYS Core mock. Same wire format, same
+ * test hooks (dropConnections / swallowNext / resetState / snapshot spies) — the
+ * mock handle was built to cover them.
  *
- * Differences from the old hand-rolled mock that tests must respect:
+ * Behaviours tests must respect (from the mock's control identity):
  *  - Controls have identity: type, range (clamped), units → rendered String/
  *    Position (e.g. -10 → "-10.0dB"), not String(value).
- *  - Ramped sets interpolate on the emulator tick; the target lands after
- *    ~ramp seconds instead of immediately.
+ *  - Sets apply immediately (the mock has no ramp interpolation).
  */
-import { parseDesign, startEmulator, type EmulatorHandle } from 'qsys-emulator';
+import { parseDesign, startMockCore, type MockCoreHandle } from 'qsys-mock-core';
 
-export type MockHandle = EmulatorHandle;
+export type MockHandle = MockCoreHandle;
 
 /** The old mock's hardcoded fixture, now as a design literal (same names/values). */
 const TEST_DESIGN = {
@@ -33,9 +31,9 @@ const TEST_DESIGN = {
 };
 
 export function startMockQrc(port = 0, opts: { isEmulator?: boolean } = {}): Promise<MockHandle> {
-  return startEmulator(parseDesign(TEST_DESIGN), {
+  return startMockCore(parseDesign(TEST_DESIGN), {
     port,
     isEmulator: opts.isEmulator,
-    tickMs: 25, // fast ramp ticks so ramped-set tests settle quickly
+    tickMs: 25, // fast AutoPoll cadence so watch/reconnect tests settle quickly
   });
 }

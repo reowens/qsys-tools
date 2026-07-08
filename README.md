@@ -169,14 +169,12 @@ npm run typecheck
 npm test
 ```
 
-The e2e suites run against a private, design-driven Q-SYS Core emulator; without it
-the e2e tests skip automatically (unit/arg-parsing tests still run). Maintainers
-with access to the emulator checkout can link it locally, then run:
-
-```sh
-npm test                # full suites
-npm run typecheck:full  # includes the emulator-backed test files
-```
+The e2e suites (QRC integration, the MCP-over-mock end-to-end, and the
+transparent-reconnect/AutoPoll-replay regression) run against
+[`qsys-mock-core`](packages/qsys-mock-core) — an in-repo, design-driven Q-SYS Core
+mock — so `npm test` exercises the full protocol with no hardware. Deeper
+conformance testing (validated-against-Designer rendering, ramps/meters, and a
+library of real Q-SYS designs) uses a separate, fuller emulator.
 
 `qsys-mac-installer` builds separately with Xcode — see
 [`packages/qsys-mac-installer`](packages/qsys-mac-installer) (`scripts/package.sh` for the

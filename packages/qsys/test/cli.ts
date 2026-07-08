@@ -1,11 +1,11 @@
 /**
- * e2e: runCli driving a real qsys-emulator over an actual TCP socket — every
- * command, plus arg-parsing edge cases (negative positionals, usage errors)
- * and a live watch stream. Run: npx tsx test/cli.ts
+ * e2e: runCli driving qsys-mock-core over an actual TCP socket — every command,
+ * plus arg-parsing edge cases (negative positionals, usage errors) and a live
+ * watch stream. Run: npx tsx test/cli.ts
  */
 import assert from 'node:assert/strict';
 import { QrcClient } from 'qsys-qrc';
-import { parseDesign, startEmulator } from 'qsys-emulator';
+import { parseDesign, startMockCore } from 'qsys-mock-core';
 import { parseCliArgs, runCli, UsageError, type CliIo } from '../src/index.js';
 
 const design = parseDesign({
@@ -51,7 +51,7 @@ async function main(): Promise<void> {
   assert.throws(() => parseCliArgs(['--bogus']), UsageError);
   ok('unknown option rejected');
 
-  const emu = await startEmulator(design, { port: 0, tickMs: 25 });
+  const emu = await startMockCore(design, { port: 0, tickMs: 25 });
   const conn = ['--host', '127.0.0.1', '--port', String(emu.port)];
   const run = async (args: string[], signal?: AbortSignal) => {
     const { io, out, err } = makeIo(signal);

@@ -47,7 +47,7 @@ jobs:
 
       - run: npm run typecheck
 
-      # The emulator-backed e2e suites auto-skip without the private qsys-emulator
-      # package (see scripts/run-if-emulator.mjs); the qsys-mac unit tests run
-      # everywhere. Typecheck above is the primary hardware-free gate.
+      # Full e2e — the QRC/MCP suites (incl. the AutoPoll-reconnect regression) run
+      # against the in-repo qsys-mock-core, so they exercise the protocol on every
+      # push with no hardware and no private dependency.
       - run: npm test

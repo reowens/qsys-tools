@@ -9,12 +9,5 @@
     "resolveJsonModule": true,
     "noEmit": true
   },
-  "include": ["packages/*/src/**/*", "packages/*/test/**/*"],
-  "exclude": [
-    "packages/qsys/test/cli.ts",
-    "packages/qsys-mcp/test/mock-qrc.ts",
-    "packages/qsys-mcp/test/integration.ts",
-    "packages/qsys-mcp/test/mcp-mock.ts",
-    "packages/qsys-mcp/test/reconnect.ts"
-  ]
+  "include": ["packages/*/src/**/*", "packages/*/test/**/*"]
 }
