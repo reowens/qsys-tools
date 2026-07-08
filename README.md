@@ -164,6 +164,7 @@ named controls or snapshot banks (you need their names from the design), and
 git clone https://github.com/reowens/qsys-tools.git
 cd qsys-tools
 npm install
+npm run build          # builds packages in dependency order (qsys-qrc first)
 npm run typecheck
 npm test
 ```

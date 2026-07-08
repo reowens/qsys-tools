@@ -36,10 +36,14 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
 
-      # `npm ci` runs each workspace's `prepare` (build), so this also verifies
-      # every package compiles to dist. Internal deps resolve to the workspace
-      # copies, so no unpublished version is fetched from the registry.
+      # Only qsys-qrc builds at install (its `prepare`); it has no workspace deps
+      # so the order is always safe. The leaf packages build via `prepack` (at
+      # publish), so a clean install never hits a build-order failure.
       - run: npm ci
+
+      # Build in dependency order (qsys-qrc first) so the dependent packages can
+      # resolve its `dist`. This also verifies every package compiles to dist.
+      - run: npm run build
 
       - run: npm run typecheck
 

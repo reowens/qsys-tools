@@ -17,7 +17,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "postbuild": "node -e \"require('fs').chmodSync('dist/bin.js', 0o755)\"",
-    "prepare": "npm run build",
+    "prepack": "npm run build",
     "qsys": "tsx src/bin.ts --",
     "test": "node ../../scripts/run-if-emulator.mjs \"tsx test/cli.ts\""
   },
