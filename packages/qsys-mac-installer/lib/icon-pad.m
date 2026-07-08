@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 // Copyright (C) 2026 Robert Owens
 // icon-pad.m — draw a source image scaled + centered on a transparent square canvas.
 //

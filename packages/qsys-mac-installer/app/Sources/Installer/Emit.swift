@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 // Copyright (C) 2026 Robert Owens
 // Emit — the installer's final act: place the emitted "Q-SYS Designer.app" into /Applications
 // and give it the real QSC icon.

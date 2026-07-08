@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 # Copyright (C) 2026 Robert Owens
 # bundle-deps.sh — Phase 3 (Tier B) build-time step. Populates app/Resources/{bin,cache}
 # with Wine/.NET plus helper binaries so first-run provisioning does not download them or

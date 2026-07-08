@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 // Copyright (C) 2026 Robert Owens
 // appmenu.m — in-process macOS app-menu shim for the Q-SYS Designer BYO wrapper.
 //
@@ -392,7 +392,7 @@ static void qsys_setApplicationIconImage(id self, SEL _cmd, NSImage *image) {
     NSString *notice = @"Unofficial community wrapper — not affiliated with, endorsed by, or "
                         "sponsored by QSC, LLC.\n“Q-SYS” and “Q-SYS Designer” are "
                         "trademarks of QSC, LLC, used nominatively to name the software you supplied.\n"
-                        "Wrapper: GPL-3.0-or-later · github.com/reowens/qsys-tools";
+                        "Wrapper: MIT · github.com/reowens/qsys-tools";
     NSMutableParagraphStyle *center = [[NSMutableParagraphStyle alloc] init];
     center.alignment = NSTextAlignmentCenter;
     NSAttributedString *credits = [[NSAttributedString alloc] initWithString:notice attributes:@{

@@ -8,7 +8,7 @@
 [![npm qsys-mcp](https://img.shields.io/npm/v/qsys-mcp.svg?label=qsys-mcp)](https://www.npmjs.com/package/qsys-mcp)
 [![npm qsys-mac](https://img.shields.io/npm/v/qsys-mac.svg?label=qsys-mac)](https://www.npmjs.com/package/qsys-mac)
 [![node ≥18](https://img.shields.io/badge/node-%E2%89%A518-brightgreen.svg)](https://nodejs.org)
-[![license: MIT + GPL-3.0](https://img.shields.io/badge/license-MIT%20%2B%20GPL--3.0-blue.svg)](#licensing)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](#licensing)
 
 Every Q-SYS Core — and Q-SYS Designer in **Emulate mode** — serves QSC's published
 **QRC** protocol (JSON-RPC 2.0 over TCP, port 1710). It's the same external-control
@@ -194,8 +194,13 @@ npm run qsys-mac -- install "/path/to/Q-SYS Designer Installer 10.4.0.exe"
 
 ## Licensing
 
-- npm packages (`qsys-cli`, `qsys-qrc`, `qsys-mcp`): **MIT**
-- `qsys-mac` npm bootstrapper and `qsys-mac-installer` wrapper: **GPL-3.0-or-later**
+The original `qsys-tools` source code is **MIT** licensed, including the QRC packages, the
+`qsys-mac` npm bootstrapper, and the `qsys-mac-installer` wrapper app.
+
+The signed macOS installer DMG is a multi-license binary distribution because it bundles
+redistributable third-party components such as Wine, .NET, p7zip, icoutils, `msiinfo`, and their
+runtime libraries. Those components remain under their own licenses and notices; see
+[`packages/qsys-mac-installer/THIRD-PARTY-NOTICES.md`](packages/qsys-mac-installer/THIRD-PARTY-NOTICES.md).
 
 Each package carries its own LICENSE file.
 

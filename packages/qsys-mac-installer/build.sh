@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 # Copyright (C) 2026 Robert Owens
 # build.sh — the "processor". Turns YOUR OWN downloaded Q-SYS Designer installer
 # into a working macOS .app, using a free Wine build. Ships zero QSC bytes.

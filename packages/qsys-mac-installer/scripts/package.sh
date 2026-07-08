@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 # Copyright (C) 2026 Robert Owens
 # package.sh — build, sign, notarize, staple the two-bundle Q-SYS Mac Installer + .dmg.
 #
@@ -158,14 +158,14 @@ say "Building $DMG …"
 mkdir -p "$DIST"
 STAGE="$(mktemp -d)"; trap 'rm -rf "$STAGE"' EXIT
 /usr/bin/ditto "$INSTALLER" "$STAGE/$(basename "$INSTALLER")"
-# GPLv3 §6: the distributed dmg MUST carry the icoutils written source offer + dep notices,
-# the wrapper's own GPL-3.0 license text (LICENSE), and the full text of every bundled
-# component's license (licenses/). Fail CLOSED — a missing legal file aborts the build instead
-# of shipping a non-compliant dmg that still reports "Done" (the old `&&cp||warn` did the latter).
+# The distributed dmg MUST carry the GPL component source offer + dep notices, the wrapper's
+# MIT license text (LICENSE), and the full text of every bundled component's license
+# (licenses/). Fail CLOSED — a missing legal file aborts the build instead of shipping a
+# non-compliant dmg that still reports "Done" (the old `&&cp||warn` did the latter).
 cp "$ROOT/THIRD-PARTY-NOTICES.md" "$STAGE/THIRD-PARTY-NOTICES.md" \
   || die "THIRD-PARTY-NOTICES.md missing — the dmg must carry the dep notices + icoutils GPLv3 offer."
 cp "$ROOT/LICENSE" "$STAGE/LICENSE" \
-  || die "LICENSE missing — the dmg must carry the wrapper's GPL-3.0 license text."
+  || die "LICENSE missing — the dmg must carry the wrapper's MIT license text."
 mkdir -p "$STAGE/licenses"
 for _lic in GPL-2.0.txt GPL-3.0.txt LGPL-2.1.txt MIT-dotnet.txt libpng-LICENSE.txt PCRE2-LICENCE.md; do
   cp "$ROOT/licenses/$_lic" "$STAGE/licenses/$_lic" \

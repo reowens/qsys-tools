@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 // Copyright (C) 2026 Robert Owens
 // Native companion to assemble-msi.py. It intentionally preserves the Python
 // assembler's MSI table mapping behavior so that script can remain a

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 // Copyright (C) 2026 Robert Owens
 // Remove — uninstall Q-SYS Designer: the emitted launcher (/Applications or ~/Applications)
 // and the provisioned data dir (~4 GB) under Application Support. Offered from the installer's

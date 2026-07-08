@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 # Copyright (C) 2026 Robert Owens
 # launch.sh — run an already-built prefix without the emitted .app (dev/debug).
 # Uses the same pinned recipe build.sh bakes into the .app. Pass a design path

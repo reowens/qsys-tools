@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 // Copyright (C) 2026 Robert Owens
 // Native companion to rename-font-family.py. It preserves the Python renamer's
 // sfnt/name-table rebuild behavior so that script can remain a developer-only

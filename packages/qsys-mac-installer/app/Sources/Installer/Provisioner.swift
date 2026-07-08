@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 // Copyright (C) 2026 Robert Owens
 // Provisioner — runs the bundled provision.sh (which drives lib/recipe.sh) into the
 // data dir, streaming its progress to the UI. Zero QSC code.

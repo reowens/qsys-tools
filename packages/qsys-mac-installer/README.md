@@ -14,7 +14,7 @@ provisions a Wine prefix, and emits a `Q-SYS Designer.app`.
 > script editor — under free `wine-staging 11.10` on an M4 Pro / macOS 26. No paid
 > CrossOver, no VM. Source is public at
 > [`reowens/qsys-tools`](https://github.com/reowens/qsys-tools) (`packages/qsys-mac-installer`),
-> licensed **GPL-3.0-or-later** (see [Legal & release](#legal--release)).
+> licensed **MIT** (see [Legal & release](#legal--release)).
 
 ---
 
@@ -341,19 +341,18 @@ require host `python3`.
 Full table + license texts in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md), which is
 shipped inside the `.dmg`. In brief: **Wine** (LGPL-2.1), **.NET 8 runtimes** (Microsoft .NET
 Library License for the redistributable binaries; source MIT), **p7zip** (LGPL/GPL), **libpng**
-(zlib-style), and **icoutils**
-(`wrestool`/`icotool`, **GPL-3.0**), and **msiinfo/msitools** (GPL/LGPL with GLib/libgsf/gettext/PCRE2
-runtime libraries). GPL components are why the distribution carries a **written source offer**
-(in the notices file). Each dep is invoked as a separate process at
-provision time (mere aggregation), so it does not force the wrapper's license — the wrapper is
-**GPL-3.0-or-later** by choice, for one consistent license across the distribution.
+(zlib-style), **icoutils** (`wrestool`/`icotool`, **GPL-3.0**), and **msiinfo/msitools**
+(GPL/LGPL with GLib/libgsf/gettext/PCRE2 runtime libraries). GPL components are why the
+distribution carries a **written source offer** (in the notices file). Each dep is invoked as a
+separate process at provision time (mere aggregation), so it does not force the wrapper's license;
+the wrapper's original source code is **MIT** licensed.
 
 ### License & contact
 
-This wrapper is licensed **GPL-3.0-or-later** — see [`LICENSE`](LICENSE). Copyright © 2026
+This wrapper's original source code is licensed **MIT** — see [`LICENSE`](LICENSE). Copyright © 2026
 Robert Owens. Source is public at <https://github.com/reowens/qsys-tools> (`packages/qsys-mac-installer`).
 
-For the GPLv3/LGPL **written source requests** (icoutils, Wine, p7zip), or any question, email
+For GPL/LGPL **written source requests** for bundled third-party components, or any question, email
 **robowens@me.com** or open an issue at
 <https://github.com/reowens/qsys-tools/issues>.
 

@@ -23,8 +23,8 @@ redistributed here.
 | **GNU libintl** (`gettext`) | 1.0 | localization runtime used by GLib/libgsf | LGPL-2.1-or-later |
 | **PCRE2** | 10.47 | regular expression runtime used by GLib | BSD-3-Clause WITH PCRE2-exception |
 
-Each is invoked as a separate process during setup (mere aggregation). The installer's own
-code is licensed **GPL-3.0-or-later** (see the project `LICENSE` and README).
+Each is invoked as a separate process during setup (mere aggregation). The installer's original
+source code is licensed **MIT** (see the project `LICENSE` and README).
 
 ## Written offer of source code (GPL components)
 
@@ -79,7 +79,7 @@ Full license texts ship with this distribution under `licenses/` (carried inside
 so this notice is complete without a network round-trip:
 
 - **GPL-2.0** — `licenses/GPL-2.0.txt` (GPL-2.0-or-later components in p7zip and `msiinfo`).
-- **GPL-3.0** — `licenses/GPL-3.0.txt` (icoutils; also the wrapper's own `LICENSE`).
+- **GPL-3.0** — `licenses/GPL-3.0.txt` (icoutils).
 - **LGPL-2.1** — `licenses/LGPL-2.1.txt` (Wine, p7zip, libmsi, GLib/GIO/GObject/GModule,
   libgsf, libintl).
 - **MIT** — `licenses/MIT-dotnet.txt` (the .NET runtime *source* license; the bundled binaries are

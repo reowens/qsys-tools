@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 # Copyright (C) 2026 Robert Owens
 # Compare Python and native font-family renamers across the bundled Selawik fonts.
 set -euo pipefail
