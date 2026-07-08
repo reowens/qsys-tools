@@ -49,7 +49,7 @@
   },
   "homepage": "https://github.com/reowens/qsys-tools/tree/main/packages/qsys-mcp#readme",
   "engines": {
-    "node": ">=22"
+    "node": ">=20"
   },
   "files": [
     "dist",
