@@ -18,36 +18,38 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-      # Lean matrix: Node 18/20/22 (the supported range) on Linux, plus one
-      # macOS job for the Mac-focused qsys-mac tooling. No Windows — qsys-mac is
-      # macOS-only and the rest is portable pure-JS, so it'd add cost without
-      # meaningful coverage.
+      # Lean matrix: Node 22 (LTS) + 24 (current) on Linux, plus one macOS job for
+      # the Mac-focused qsys-mac tooling. Node 22.13+ is the floor (pnpm 11 requires
+      # it). No Windows — qsys-mac is macOS-only and the rest is portable pure-JS, so
+      # it'd add cost without meaningful coverage.
       matrix:
         include:
-          - { os: ubuntu-latest, node: 18 }
-          - { os: ubuntu-latest, node: 20 }
           - { os: ubuntu-latest, node: 22 }
-          - { os: macos-latest, node: 20 }
+          - { os: ubuntu-latest, node: 24 }
+          - { os: macos-latest, node: 24 }
     steps:
       - uses: actions/checkout@v5
+
+      # Install pnpm (version comes from the root package.json "packageManager"
+      # field) before setup-node so its pnpm-store cache can resolve.
+      - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
+          cache: pnpm
 
-      # Only qsys-qrc builds at install (its `prepare`); it has no workspace deps
-      # so the order is always safe. The leaf packages build via `prepack` (at
-      # publish), so a clean install never hits a build-order failure.
-      - run: npm ci
+      # pnpm builds qsys-qrc at install (its `prepare`); --frozen-lockfile fails if
+      # the lockfile is stale rather than silently rewriting it.
+      - run: pnpm install --frozen-lockfile
 
-      # Build in dependency order (qsys-qrc first) so the dependent packages can
-      # resolve its `dist`. This also verifies every package compiles to dist.
-      - run: npm run build
+      # Build in dependency order (pnpm -r is topological, qsys-qrc first) so the
+      # dependent packages can resolve its `dist`, and every package compiles.
+      - run: pnpm -r build
 
-      - run: npm run typecheck
+      - run: pnpm run typecheck
 
       # Full e2e — the QRC/MCP suites (incl. the AutoPoll-reconnect regression) run
       # against the in-repo qsys-mock-core, so they exercise the protocol on every
       # push with no hardware and no private dependency.
-      - run: npm test
+      - run: pnpm test

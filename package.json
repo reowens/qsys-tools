@@ -4,14 +4,15 @@
   "private": true,
   "type": "module",
   "description": "Monorepo for the qsys family: qsys-qrc (QRC client core), qsys-cli (control CLI), qsys-mcp (MCP server), and qsys-mac tooling.",
-  "workspaces": [
-    "packages/*"
-  ],
+  "packageManager": "pnpm@11.10.0",
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "qsys-mac": "tsx packages/qsys-mac/src/bin.ts",
-    "build": "npm run build --workspace=qsys-qrc && npm run build --workspace=qsys-cli --workspace=qsys-mcp --workspace=qsys-mac",
+    "build": "pnpm -r build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run --workspaces --if-present test"
+    "test": "pnpm -r --if-present test"
   },
   "devDependencies": {
     "@types/node": "^22.5.0",

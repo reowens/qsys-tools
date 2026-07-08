@@ -37,7 +37,7 @@
   },
   "homepage": "https://github.com/reowens/qsys-tools/tree/main/packages/qsys#readme",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "license": "MIT",
   "keywords": [
@@ -55,9 +55,9 @@
     "typescript"
   ],
   "dependencies": {
-    "qsys-qrc": "^0.2.0"
+    "qsys-qrc": "workspace:^"
   },
   "devDependencies": {
-    "qsys-mock-core": "^0.1.0"
+    "qsys-mock-core": "workspace:^"
   }
 }

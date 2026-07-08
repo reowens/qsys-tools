@@ -22,30 +22,37 @@ instead of rendered Markdown line breaks.
 
 ## Npm Packages
 
-Publish npm packages in dependency order:
+This is a **pnpm workspace**. Internal deps use the `workspace:^` protocol, which
+**pnpm rewrites to a real version at publish time** — so publish with `pnpm publish`,
+**not** `npm publish` (npm cannot resolve `workspace:`). `qsys-mock-core` is
+`private` and is never published.
+
+Publish in dependency order (each `--filter` builds via `prepack` and rewrites its
+`workspace:^` dep on qsys-qrc):
 
 ```sh
-npm publish --workspace=qsys-qrc --access public
-npm publish --workspace=qsys-cli --access public
-npm publish --workspace=qsys-mcp --access public
-npm publish --workspace=qsys-mac --access public
+pnpm --filter qsys-qrc publish --access public
+pnpm --filter qsys-cli publish --access public
+pnpm --filter qsys-mcp publish --access public
+pnpm --filter qsys-mac publish --access public
 ```
 
-If npm asks for 2FA, pass the current OTP:
+If npm asks for 2FA, pass the current OTP (and `--no-git-checks` if publishing from a
+non-release working state):
 
 ```sh
-npm publish --workspace=<package> --access public --otp="$OTP"
+pnpm --filter <package> publish --access public --otp="$OTP"
 ```
 
 Before publishing:
 
 ```sh
-npm run typecheck
-npm test
-npm pack --workspace=qsys-qrc --dry-run --json
-npm pack --workspace=qsys-cli --dry-run --json
-npm pack --workspace=qsys-mcp --dry-run --json
-npm pack --workspace=qsys-mac --dry-run --json
+pnpm run typecheck
+pnpm test
+pnpm --filter qsys-qrc pack   # inspect the tarball; confirm workspace:^ became a real range
+pnpm --filter qsys-cli pack
+pnpm --filter qsys-mcp pack
+pnpm --filter qsys-mac pack
 ```
 
 After publishing, verify:
@@ -95,7 +102,7 @@ Before publishing `qsys-mac`:
 - Update `packages/qsys-mac/src/index.ts` so `DEFAULT_RELEASE` points at the
   final `qsys-mac-installer-vX.Y.Z/qsys-mac-installer.dmg` URL.
 - Replace `DEFAULT_RELEASE.sha256` with the exact uploaded DMG SHA-256.
-- Run `npm pack --workspace=qsys-mac --dry-run --json` and inspect the tarball contents.
+- Run `pnpm --filter qsys-mac pack` and inspect the tarball contents.
 - Confirm `npx qsys-mac --dmg packages/qsys-mac-installer/dist/qsys-mac-installer.dmg status`
   mounts the local DMG, delegates to the bundled helper, and detaches cleanly.
 

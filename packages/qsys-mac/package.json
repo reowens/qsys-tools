@@ -36,7 +36,7 @@
   },
   "homepage": "https://github.com/reowens/qsys-tools/tree/main/packages/qsys-mac#readme",
   "engines": {
-    "node": ">=18.17"
+    "node": ">=22"
   },
   "license": "MIT",
   "keywords": [

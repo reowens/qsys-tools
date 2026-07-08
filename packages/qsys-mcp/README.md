@@ -16,7 +16,7 @@ It's a pure wire-protocol client: **zero QSC code**, no SDK, no hardware require
 
 - **18 tools** covering connect, status, discovery, read, write (with ramps), snapshots, the full change-group lifecycle (add/poll/remove/clear/invalidate/destroy), and disconnect.
 - **No hardware needed** — develop entirely against Designer's Emulate-mode soft-core on `localhost`.
-- **Cross-platform** — `node:net` only; CI proves it on Linux, macOS, and Windows × Node 18 & 20.
+- **Cross-platform** — `node:net` only; CI proves it on Linux + macOS × Node 22 & 24.
 - **Context-friendly** — list/get tools take `filter` / `names_only` / `type` so large designs don't flood the agent's context.
 - **Safe by default** — write tools warn when they're hitting a live Core (not an emulator); a 30 s `NoOp` keepalive holds the socket open through QRC's 60 s idle close.
 - **Self-healing** — on a dropped socket (Core restart, leaving Emulate, a network blip) the client auto-reconnects and replays your change-group registrations, so polling resumes without re-calling `qsys_connect`. Opt out with `reconnect: false`.
@@ -40,7 +40,9 @@ Or from source:
 ```bash
 git clone https://github.com/reowens/qsys-tools.git
 cd qsys-tools
-npm install                          # builds dist/ via the prepare hooks
+corepack enable
+pnpm install
+pnpm -r build                        # compiles every package to dist/
 node packages/qsys-mcp/dist/index.js
 ```
 
@@ -136,17 +138,17 @@ QRC is fully functional in Emulate mode, so you can build and test without any h
 ## Develop & verify
 
 ```bash
-npm test                               # offline: QRC integration + MCP-over-mock (no hardware)
-npm run smoke -- 127.0.0.1 1710        # read-only smoke against a live emulator/Core
-npm run smoke:mcp -- 127.0.0.1 1710    # full MCP-over-stdio smoke against a live target
-npm run smoke:write -- 127.0.0.1 1710  # live WRITE round-trip: set a gain, verify, restore
-npm run smoke:named -- MainGain        # live Named-Control read/set + change-group poll
-npm run smoke:keepalive                # idle >60s, prove the socket survives QRC's idle close
+pnpm test                               # offline: QRC integration + MCP-over-mock (no hardware)
+pnpm run smoke -- 127.0.0.1 1710        # read-only smoke against a live emulator/Core
+pnpm run smoke:mcp -- 127.0.0.1 1710    # full MCP-over-stdio smoke against a live target
+pnpm run smoke:write -- 127.0.0.1 1710  # live WRITE round-trip: set a gain, verify, restore
+pnpm run smoke:named -- MainGain        # live Named-Control read/set + change-group poll
+pnpm run smoke:keepalive                # idle >60s, prove the socket survives QRC's idle close
 ```
 
-`npm test` needs no hardware; every `smoke:*` script needs a live target (a real Core, or Designer in Emulate mode, on port 1710).
+`pnpm test` needs no hardware; every `smoke:*` script needs a live target (a real Core, or Designer in Emulate mode, on port 1710).
 
-**CI** runs `npm ci && npm run build && npm run typecheck && npm test` on Linux, macOS, and Windows × Node 18 & 20 ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). The whole suite is hardware-free — a mock QRC server plus an in-memory MCP transport — so the full matrix runs without a Core.
+**CI** runs `pnpm install --frozen-lockfile && pnpm -r build && pnpm run typecheck && pnpm test` on Linux + macOS × Node 22 & 24 ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). The whole suite is hardware-free — the in-repo `qsys-mock-core` QRC server plus an in-memory MCP transport — so the full matrix runs without a Core.
 
 ## Roadmap / out of scope
 
