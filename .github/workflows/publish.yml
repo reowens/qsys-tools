@@ -30,11 +30,13 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 24 # ships npm >= 11.5.1, required for trusted publishing
+          node-version: 24 # ships npm >= 11.5.1 (with sigstore) — required for trusted publishing + provenance
           registry-url: 'https://registry.npmjs.org'
           cache: pnpm
 
-      - run: npm install -g npm@latest # guarantee npm >= 11.5.1
+      # NB: do NOT `npm install -g npm@latest` — the global self-reinstall drops
+      # npm's bundled `sigstore` dep, which `--provenance` needs (MODULE_NOT_FOUND).
+      # Node 24's bundled npm is new enough and has sigstore intact.
 
       - run: pnpm install --frozen-lockfile
 
