@@ -15,6 +15,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "qsys-qrc": "^0.2.0"
+    "qsys-qrc": "workspace:^"
   }
 }

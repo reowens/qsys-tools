@@ -31,7 +31,7 @@
   },
   "homepage": "https://github.com/reowens/qsys-tools/tree/main/packages/qsys-qrc#readme",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "license": "MIT",
   "keywords": [

@@ -160,19 +160,23 @@ named controls or snapshot banks (you need their names from the design), and
 
 ## Development
 
+This is a [pnpm](https://pnpm.io) workspace (Node 22.13+; pnpm comes from the
+`packageManager` field via [corepack](https://nodejs.org/api/corepack.html)).
+
 ```sh
 git clone https://github.com/reowens/qsys-tools.git
 cd qsys-tools
-npm install
-npm run build          # builds packages in dependency order (qsys-qrc first)
-npm run typecheck
-npm test
+corepack enable        # provisions the pinned pnpm
+pnpm install
+pnpm -r build          # builds packages in dependency order (qsys-qrc first)
+pnpm run typecheck
+pnpm test
 ```
 
 The e2e suites (QRC integration, the MCP-over-mock end-to-end, and the
 transparent-reconnect/AutoPoll-replay regression) run against
 [`qsys-mock-core`](packages/qsys-mock-core) — an in-repo, design-driven Q-SYS Core
-mock — so `npm test` exercises the full protocol with no hardware. Deeper
+mock — so `pnpm test` exercises the full protocol with no hardware. Deeper
 conformance testing (validated-against-Designer rendering, ramps/meters, and a
 library of real Q-SYS designs) uses a separate, fuller emulator.
 
@@ -183,12 +187,12 @@ sign/notarize pipeline).
 Maintainer release steps are documented in [`RELEASE.md`](RELEASE.md).
 
 When working from this source checkout, use the workspace script instead of
-`npx qsys-mac` so npm does not confuse the local workspace package with the
-published package:
+`npx qsys-mac` so the local workspace package isn't confused with the published
+one:
 
 ```sh
-npm run qsys-mac -- status
-npm run qsys-mac -- install "/path/to/Q-SYS Designer Installer 10.4.0.exe"
+pnpm run qsys-mac -- status
+pnpm run qsys-mac -- install "/path/to/Q-SYS Designer Installer 10.4.0.exe"
 ```
 
 ## Licensing

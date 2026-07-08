@@ -1,0 +1,8 @@
+packages:
+  - 'packages/*'
+
+# tsx's esbuild ships a native postinstall (fetches/links its platform binary);
+# approve it so tsx runs in dev and CI. pnpm blocks dependency build scripts by
+# default and requires this explicit allowlist.
+allowBuilds:
+  esbuild: true
