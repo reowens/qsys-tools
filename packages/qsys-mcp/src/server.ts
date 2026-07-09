@@ -497,6 +497,81 @@ export function buildServer(): McpServer {
     },
   );
 
+  // ---- Loop Player control (LoopPlayer.{Start,Stop,Cancel}; write-only — read per-output
+  // state back via qsys_get_component). Outputs are integer lists, NOT Mixer String Syntax. ----
+
+  server.registerTool(
+    'qsys_loop_player_start',
+    {
+      title: 'Start Loop Player playback',
+      description:
+        'Schedule one or more audio files to play on a Loop Player component (LoopPlayer.Start). ' +
+        'This MUTATES the running/emulated system. There is no QRC method to browse Core files — ' +
+        'pass a file path you already know. Read Loop Player state back via qsys_get_component.',
+      inputSchema: {
+        name: z.string().describe('Loop Player component name (its "Code Name")'),
+        files: z
+          .array(
+            z.object({
+              name: z.string().describe('Path + filename of the file on the Core (e.g. "Audio/mainloop.wav")'),
+              output: z.number().int().describe('Output track number to play on'),
+              loop: z.boolean().optional().describe('Loop the file continuously (default false)'),
+              seek: z.number().optional().describe('Offset into the file to start at, in seconds (default 0)'),
+              log: z.boolean().optional().describe('Log start + errors to the Core event log (default false)'),
+              refId: z
+                .string()
+                .optional()
+                .describe('If set, the Core logs an async failure notification for this job (the notification is not surfaced by these tools yet)'),
+            }),
+          )
+          .min(1)
+          .describe('One file→output assignment per entry'),
+        startTime: z
+          .number()
+          .optional()
+          .describe('-1 = now, -2 = queue after current, ≥0 = absolute time-of-day (s). Omitted → Core default (0). With Time source "None", 0 plays now and >0 has no effect.'),
+      },
+    },
+    async ({ name, files, startTime }) => {
+      try {
+        const result = await requireClient().loopPlayerStart({ name, files, startTime });
+        const warning = liveCoreWarning();
+        return ok(warning ? { warning, result } : result);
+      } catch (e) {
+        return fail((e as Error).message);
+      }
+    },
+  );
+
+  server.registerTool(
+    'qsys_loop_player_stop_cancel',
+    {
+      title: 'Stop or cancel Loop Player playback',
+      description:
+        'Stop current playback on outputs (op "stop"), or cancel a pending/queued future-start job ' +
+        'without disrupting current playback (op "cancel") — LoopPlayer.Stop / LoopPlayer.Cancel. ' +
+        'Outputs is a list of integer output numbers (e.g. [1, 2]). This MUTATES the running/emulated system.',
+      inputSchema: {
+        name: z.string().describe('Loop Player component name (its "Code Name")'),
+        op: z.enum(['stop', 'cancel']).describe('"stop" halts current playback; "cancel" aborts a queued future-start job'),
+        outputs: z.array(z.number().int()).min(1).describe('Output track numbers as an integer list, e.g. [1, 2]'),
+        log: z.boolean().optional().describe('Log the stop/cancel to the Core event log (default false)'),
+      },
+    },
+    async ({ name, op, outputs, log }) => {
+      try {
+        const c = requireClient();
+        const result = op === 'stop'
+          ? await c.loopPlayerStop(name, outputs, log)
+          : await c.loopPlayerCancel(name, outputs, log);
+        const warning = liveCoreWarning();
+        return ok(warning ? { warning, result } : result);
+      } catch (e) {
+        return fail((e as Error).message);
+      }
+    },
+  );
+
   server.registerTool(
     'qsys_create_change_group',
     {

@@ -6,6 +6,20 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-09
+
+### Added
+
+- Loop Player control: 3 wrappers over the QRC `LoopPlayer.*` methods —
+  `loopPlayerStart({ name, startTime?, files })`, `loopPlayerStop(name, outputs, log?)`,
+  and `loopPlayerCancel(name, outputs, log?)`, plus the `LoopPlayerFile` /
+  `LoopPlayerStartParams` types. `files[]` maps to QRC casing (`Name`/`Output`/`Loop`/
+  `Seek`/`Log`/`RefID`) with unset options omitted; `Stop`/`Cancel` send `Outputs` as a
+  **table of integers** (`[1, 2]`), NOT Mixer String Syntax; `StartTime` is passed raw
+  (`-1` now, `-2` queue-after-current, `≥0` absolute time-of-day). Method names and
+  params verified against the Q-SYS v10.4 offline help. Loop Player state reads back
+  through `Component.Get` (no `LoopPlayer.Get*` on the wire).
+
 ## [0.3.0] - 2026-07-09
 
 ### Added

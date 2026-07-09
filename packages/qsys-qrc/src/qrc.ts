@@ -518,6 +518,49 @@ export class QrcClient extends EventEmitter {
     return this.send('Mixer.SetInputCueAfl', { Name: name, Cues: cues, Inputs: inputs, Value: value });
   }
 
+  // ---- LoopPlayer.{Start,Stop,Cancel} (write-only; no LoopPlayer.Get* exists — read state
+  // back via Component.Get on the Loop Player's per-output controls). Unlike the Mixer, Stop/
+  // Cancel take `Outputs` as a **table of integers** ([1,2]), NOT QRC String Syntax. `StartTime`
+  // is passed raw: -1 now, -2 queue-after-current, ≥0 absolute time-of-day (see LoopPlayerStart).
+
+  /**
+   * Schedule file playback on a Loop Player (LoopPlayer.Start). `files` is the full array —
+   * one object per output. Optional per-file `loop`/`seek`/`log`/`refId` and top-level
+   * `startTime` are omitted from the wire when unset, letting the Core apply its documented
+   * defaults (loop=false, seek=0, startTime=0). `refId` requests an async failure notification
+   * — the notification itself isn't surfaced yet (no push channel), but the Core still logs it.
+   */
+  loopPlayerStart(params: LoopPlayerStartParams): Promise<unknown> {
+    const p: Record<string, unknown> = {
+      Name: params.name,
+      Files: params.files.map((f) => {
+        const o: Record<string, unknown> = { Name: f.name, Output: f.output };
+        if (f.loop != null) o.Loop = f.loop;
+        if (f.seek != null) o.Seek = f.seek;
+        if (f.log != null) o.Log = f.log;
+        if (f.refId != null) o.RefID = f.refId;
+        return o;
+      }),
+    };
+    if (params.startTime != null) p.StartTime = params.startTime;
+    return this.send('LoopPlayer.Start', p);
+  }
+
+  /** Stop playback on the given output tracks (LoopPlayer.Stop). `outputs` is an integer table. */
+  loopPlayerStop(name: string, outputs: number[], log?: boolean): Promise<unknown> {
+    const p: Record<string, unknown> = { Name: name, Outputs: outputs };
+    if (log != null) p.Log = log;
+    return this.send('LoopPlayer.Stop', p);
+  }
+
+  /** Cancel a pending/queued (future-start) job on the given outputs without disrupting current
+   *  playback (LoopPlayer.Cancel). `outputs` is an integer table. */
+  loopPlayerCancel(name: string, outputs: number[], log?: boolean): Promise<unknown> {
+    const p: Record<string, unknown> = { Name: name, Outputs: outputs };
+    if (log != null) p.Log = log;
+    return this.send('LoopPlayer.Cancel', p);
+  }
+
   private groupState(id: string): ChangeGroupState {
     let g = this.changeGroups.get(id);
     if (!g) {
@@ -529,6 +572,32 @@ export class QrcClient extends EventEmitter {
 }
 
 export type ControlValue = number | string | boolean;
+
+/** One file→output assignment in a LoopPlayer.Start. Lowercase here; mapped to QRC casing
+ *  (Name/Output/Loop/Seek/Log/RefID) on the wire, undefined optionals omitted. */
+export interface LoopPlayerFile {
+  /** Path + filename of the file to play, as it exists on the Core. */
+  name: string;
+  /** Output track number to play on. */
+  output: number;
+  /** Loop the file continuously (default false). */
+  loop?: boolean;
+  /** Offset into the file to start at, in seconds (default 0). */
+  seek?: number;
+  /** Log start + errors to the Core event log (default false). */
+  log?: boolean;
+  /** If set, the Core sends an async failure notification (+ event-log entry) for this job. */
+  refId?: string;
+}
+
+export interface LoopPlayerStartParams {
+  /** Loop Player component name (its "Code Name" property). */
+  name: string;
+  /** -1 = now, -2 = queue after current, ≥0 = absolute time-of-day (s). Omitted → Core default (0). */
+  startTime?: number;
+  /** One or more file→output assignments. */
+  files: LoopPlayerFile[];
+}
 
 export interface EngineStatus {
   Platform: string;

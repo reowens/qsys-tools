@@ -1,4 +1,4 @@
-import { QrcClient, type QrcControl } from 'qsys-qrc';
+import { QrcClient, type QrcControl, type LoopPlayerFile } from 'qsys-qrc';
 import {
   CONTROL_HEADER,
   coerceValue,
@@ -34,6 +34,9 @@ commands:
   mixer output <comp> <out> <op> <value> [--ramp <s>]           op: gain|mute
   mixer cue <comp> <cues> <op> <value> [--ramp <s>]             op: gain|mute
   mixer cue-input <comp> <cues> <in> <op> <value>               op: enable|afl
+  loop-player start <comp> <file> <output> [--loop] [--seek <s>] [--start-time <t>] [--log] [--ref-id <id>]
+  loop-player stop <comp> <outputs> [--log]                     outputs: int list "1,2"
+  loop-player cancel <comp> <outputs> [--log]                   cancel a queued future-start job
 
 connection:
   --host <ip>        Core/emulator address (or QSYS_HOST)
@@ -54,8 +57,9 @@ selectors and * so the shell doesn't split/glob them. Gain/delay take a number (
 const STRING_FLAGS = new Set([
   'host', 'port', 'user', 'password', 'timeout',
   'type', 'filter', 'ramp', 'component', 'interval',
+  'seek', 'start-time', 'ref-id',
 ]);
-const BOOL_FLAGS = new Set(['json', 'help']);
+const BOOL_FLAGS = new Set(['json', 'help', 'loop', 'log']);
 
 interface ParsedArgs {
   flags: Record<string, string | boolean>;
@@ -244,6 +248,9 @@ export async function runCli(
       case 'mixer':
         return await mixerCommand(client, rest, flags, json, io);
 
+      case 'loop-player':
+        return await loopPlayerCommand(client, rest, flags, json, io);
+
       case 'watch':
         return await watch(client, rest, flags, json, io);
 
@@ -368,6 +375,78 @@ async function mixerCommand(
     }
     default:
       throw new UsageError(`unknown mixer target: ${target ?? '(none)'} (expected crosspoint|input|output|cue|cue-input)`);
+  }
+}
+
+/** Parse an integer output list ("1,2" or "1 2") for loop-player stop/cancel. */
+function parseOutputList(raw: string): number[] {
+  const parts = raw.split(/[ ,]+/).filter(Boolean);
+  if (parts.length === 0) throw new UsageError('expected at least one output number');
+  return parts.map((p) => {
+    const n = Number(p);
+    if (!Number.isInteger(n)) throw new UsageError(`invalid output: ${p}`);
+    return n;
+  });
+}
+
+/**
+ * `qsys loop-player <start|stop|cancel> …` — mirrors the 2 grouped MCP loop-player tools.
+ * Write-only (no LoopPlayer.Get on the wire); prints a confirmation line and points at
+ * get-component for readback. The CLI plays a single file per `start`; the MCP tool accepts
+ * a full files[] array. `stop`/`cancel` take an integer output list ("1,2"), NOT String Syntax.
+ */
+async function loopPlayerCommand(
+  client: QrcClient,
+  rest: string[],
+  flags: Record<string, string | boolean>,
+  json: boolean,
+  io: CliIo,
+): Promise<number> {
+  const target = rest[0];
+  const a = rest.slice(1);
+  switch (target) {
+    case 'start': {
+      need(a, 3, 'qsys loop-player start <comp> <file> <output> [--loop] [--seek <s>] [--start-time <t>] [--log] [--ref-id <id>]');
+      const [comp, file, outputRaw] = a;
+      const output = Number(outputRaw);
+      if (!Number.isInteger(output)) throw new UsageError(`invalid output: ${outputRaw}`);
+      const startTime = numFlag(flags['start-time'], 'start-time');
+      const seek = numFlag(flags.seek, 'seek');
+      const refId = flags['ref-id'] as string | undefined;
+      const fileEntry: LoopPlayerFile = { name: file, output };
+      if (flags.loop === true) fileEntry.loop = true;
+      if (seek != null) fileEntry.seek = seek;
+      if (flags.log === true) fileEntry.log = true;
+      if (refId != null) fileEntry.refId = refId;
+      await client.loopPlayerStart({ name: comp, files: [fileEntry], startTime });
+      if (json) {
+        io.out(JSON.stringify({ ok: true, target: 'start', name: comp, files: [fileEntry], ...(startTime != null ? { startTime } : {}) }, null, 2));
+        return 0;
+      }
+      const opts: string[] = [];
+      if (flags.loop === true) opts.push('loop');
+      if (seek != null) opts.push(`seek=${seek}s`);
+      if (startTime != null) opts.push(`start=${startTime}`);
+      io.out(`loop-player start "${comp}" out=${output} file="${file}"${opts.length ? ' ' + opts.join(' ') : ''}`);
+      return 0;
+    }
+    case 'stop':
+    case 'cancel': {
+      need(a, 2, `qsys loop-player ${target} <comp> <outputs> [--log]`);
+      const [comp, outputsRaw] = a;
+      const outputs = parseOutputList(outputsRaw);
+      const log = flags.log === true ? true : undefined;
+      if (target === 'stop') await client.loopPlayerStop(comp, outputs, log);
+      else await client.loopPlayerCancel(comp, outputs, log);
+      if (json) {
+        io.out(JSON.stringify({ ok: true, target, name: comp, outputs, ...(log ? { log } : {}) }, null, 2));
+        return 0;
+      }
+      io.out(`loop-player ${target} "${comp}" outputs=${outputs.join(',')}${log ? ' log' : ''}`);
+      return 0;
+    }
+    default:
+      throw new UsageError(`unknown loop-player target: ${target ?? '(none)'} (expected start|stop|cancel)`);
   }
 }
 

@@ -122,6 +122,40 @@ async function main(): Promise<void> {
     'cue-input enable maps Cues + Inputs (negation selector passes through verbatim)',
   );
 
+  // LoopPlayer.{Start,Stop,Cancel} — write-only wrappers; assert the exact method + params.
+  // Outputs is an integer table (NOT String Syntax); unset per-file/top-level fields are omitted.
+  await client.loopPlayerStart({ name: 'Player1', files: [{ name: 'Audio/mainloop.wav', output: 1 }] });
+  assert.deepEqual(
+    mock.lastLoopPlayerCall(),
+    { method: 'LoopPlayer.Start', params: { Name: 'Player1', Files: [{ Name: 'Audio/mainloop.wav', Output: 1 }] } },
+    'Start maps files[]→Name/Output and omits StartTime + unset options',
+  );
+  await client.loopPlayerStart({
+    name: 'Player1',
+    startTime: -2, // queue after current
+    files: [{ name: 'Audio/next.wav', output: 2, loop: true, seek: 3, log: true, refId: 'job-7' }],
+  });
+  assert.deepEqual(
+    mock.lastLoopPlayerCall(),
+    {
+      method: 'LoopPlayer.Start',
+      params: { Name: 'Player1', StartTime: -2, Files: [{ Name: 'Audio/next.wav', Output: 2, Loop: true, Seek: 3, Log: true, RefID: 'job-7' }] },
+    },
+    'Start passes StartTime + all per-file options through with QRC casing',
+  );
+  await client.loopPlayerStop('Player1', [1, 2]);
+  assert.deepEqual(
+    mock.lastLoopPlayerCall(),
+    { method: 'LoopPlayer.Stop', params: { Name: 'Player1', Outputs: [1, 2] } },
+    'Stop sends Outputs as an integer table, omitting Log',
+  );
+  await client.loopPlayerCancel('Player1', [3], true);
+  assert.deepEqual(
+    mock.lastLoopPlayerCall(),
+    { method: 'LoopPlayer.Cancel', params: { Name: 'Player1', Outputs: [3], Log: true } },
+    'Cancel sends Outputs + Log',
+  );
+
   // Destroy frees the group (ChangeGroup.Destroy)
   await client.changeGroupDestroy('cg2');
   await assert.rejects(() => client.changeGroupPoll('cg2'), /Unknown change group/);

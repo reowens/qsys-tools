@@ -6,6 +6,21 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-09
+
+### Added
+
+- `qsys loop-player {start,stop,cancel}` — drive a Loop Player from the CLI. `start`
+  plays a single `<file> <output>` with `--loop`, `--seek`, `--start-time`, `--log`, and
+  `--ref-id`; `stop`/`cancel` take an integer output list (`"1,2"`) with `--log`. Each
+  dispatches to the matching `qsys-qrc` `loopPlayer*` wrapper, with a confirmation echo
+  and `--json`. Loop Player state is inspected via `qsys get-component <player>` (there is
+  no `LoopPlayer.Get*`).
+
+### Changed
+
+- Requires `qsys-qrc` ^0.4.0 (for the `loopPlayer*` wrappers).
+
 ## [0.2.0] - 2026-07-09
 
 ### Added

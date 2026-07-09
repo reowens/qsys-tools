@@ -33,6 +33,8 @@ export interface MockCoreHandle {
   lastSnapshotSave: () => unknown;
   /** The last Mixer.Set* call the core acked ({ method, params }), or null. */
   lastMixerCall: () => { method: string; params: unknown } | null;
+  /** The last LoopPlayer.* call the core acked ({ method, params }), or null. */
+  lastLoopPlayerCall: () => { method: string; params: unknown } | null;
   /** The underlying engine (introspection for tests). */
   core: MockCore;
 }
@@ -152,6 +154,7 @@ export function startMockCore(design: Design, opts: MockCoreOptions = {}): Promi
         lastSnapshotLoad: () => core.lastSnapshotLoad(),
         lastSnapshotSave: () => core.lastSnapshotSave(),
         lastMixerCall: () => core.lastMixerCall(),
+        lastLoopPlayerCall: () => core.lastLoopPlayerCall(),
         core,
       });
     });

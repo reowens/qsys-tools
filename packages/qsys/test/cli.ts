@@ -200,6 +200,55 @@ async function main(): Promise<void> {
     ok('mixer rejects an invalid op');
   }
 
+  // -- loop-player (write-only; assert exact wire mapping via the mock's lastLoopPlayerCall spy) --
+  {
+    const { code, text } = await run(['loop-player', 'start', 'Player1', 'Audio/main.wav', '1']);
+    assert.equal(code, 0);
+    assert.deepEqual(emu.lastLoopPlayerCall(), {
+      method: 'LoopPlayer.Start',
+      params: { Name: 'Player1', Files: [{ Name: 'Audio/main.wav', Output: 1 }] },
+    });
+    assert.match(text, /loop-player start .*out=1 file="Audio\/main.wav"/);
+    ok('loop-player start maps a single file→output, omits unset options');
+  }
+  {
+    await run(['loop-player', 'start', 'Player1', 'Audio/next.wav', '2',
+      '--loop', '--seek', '3', '--start-time', '-2', '--log', '--ref-id', 'job-7']);
+    assert.deepEqual(emu.lastLoopPlayerCall(), {
+      method: 'LoopPlayer.Start',
+      params: { Name: 'Player1', StartTime: -2, Files: [{ Name: 'Audio/next.wav', Output: 2, Loop: true, Seek: 3, Log: true, RefID: 'job-7' }] },
+    });
+    ok('loop-player start passes flags + negative start-time through');
+  }
+  {
+    await run(['loop-player', 'stop', 'Player1', '1,2']);
+    assert.deepEqual(emu.lastLoopPlayerCall(), {
+      method: 'LoopPlayer.Stop',
+      params: { Name: 'Player1', Outputs: [1, 2] },
+    });
+    ok('loop-player stop parses an integer output list');
+  }
+  {
+    await run(['loop-player', 'cancel', 'Player1', '3', '--log']);
+    assert.deepEqual(emu.lastLoopPlayerCall(), {
+      method: 'LoopPlayer.Cancel',
+      params: { Name: 'Player1', Outputs: [3], Log: true },
+    });
+    ok('loop-player cancel sends Outputs + Log');
+  }
+  {
+    const { code, err } = await run(['loop-player', 'start', 'Player1', 'x.wav', 'notanint']);
+    assert.equal(code, 2);
+    assert.match(err.join('\n'), /invalid output/);
+    ok('loop-player start rejects a non-integer output');
+  }
+  {
+    const { code, err } = await run(['loop-player', 'bogus', 'Player1']);
+    assert.equal(code, 2);
+    assert.match(err.join('\n'), /unknown loop-player target/);
+    ok('loop-player rejects an unknown target');
+  }
+
   // -- watch: baseline + pushed change, abort ends the stream --
   {
     const abort = new AbortController();

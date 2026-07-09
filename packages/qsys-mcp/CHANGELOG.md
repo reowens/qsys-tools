@@ -6,6 +6,22 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-09
+
+### Added
+
+- Loop Player control: 2 grouped tools (23 → **25**) — `qsys_loop_player_start`
+  (nested `files[]` with per-file `output`/`loop`/`seek`/`log`/`refId`, plus optional
+  `startTime`) and `qsys_loop_player_stop_cancel` (`op: stop | cancel`, `outputs` as an
+  integer list). Both mutate and emit the live-Core warning. Outputs are integer lists
+  (NOT String Syntax); `startTime` is forwarded raw. Loop Player state reads back through
+  `qsys_get_component` (no `LoopPlayer.Get*` on the wire). `refId` is accepted, but its
+  async failure notification is not surfaced yet (pending the push channel).
+
+### Changed
+
+- Requires `qsys-qrc` ^0.4.0 (for the `loopPlayer*` wrappers).
+
 ## [0.4.0] - 2026-07-09
 
 ### Added

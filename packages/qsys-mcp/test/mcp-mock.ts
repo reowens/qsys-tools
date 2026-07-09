@@ -26,6 +26,8 @@ const EXPECTED_TOOLS = [
   'qsys_mixer_set_output',
   'qsys_mixer_set_cue',
   'qsys_mixer_set_cue_input',
+  'qsys_loop_player_start',
+  'qsys_loop_player_stop_cancel',
   'qsys_create_change_group',
   'qsys_poll_change_group',
   'qsys_change_group_add_component',
@@ -125,6 +127,26 @@ async function main(): Promise<void> {
   });
   assert.ok(badMute?.isError && /boolean/.test(text(badMute)), 'mute op rejects a numeric value');
 
+  // Loop Player tools reach the correct wire call (integer Outputs table, StartTime pass-through)...
+  await call('qsys_loop_player_start', { name: 'Player1', files: [{ name: 'Audio/a.wav', output: 1 }], startTime: -1 });
+  assert.deepEqual(
+    mock.lastLoopPlayerCall(),
+    { method: 'LoopPlayer.Start', params: { Name: 'Player1', StartTime: -1, Files: [{ Name: 'Audio/a.wav', Output: 1 }] } },
+    'loop player start tool emits StartTime + Files with QRC casing',
+  );
+  await call('qsys_loop_player_stop_cancel', { name: 'Player1', op: 'stop', outputs: [1, 2] });
+  assert.deepEqual(
+    mock.lastLoopPlayerCall(),
+    { method: 'LoopPlayer.Stop', params: { Name: 'Player1', Outputs: [1, 2] } },
+    'stop op emits LoopPlayer.Stop with an integer Outputs table',
+  );
+  await call('qsys_loop_player_stop_cancel', { name: 'Player1', op: 'cancel', outputs: [3], log: true });
+  assert.deepEqual(
+    mock.lastLoopPlayerCall(),
+    { method: 'LoopPlayer.Cancel', params: { Name: 'Player1', Outputs: [3], Log: true } },
+    'cancel op emits LoopPlayer.Cancel with Log',
+  );
+
   await call('qsys_destroy_change_group', { id: 'g' });
   const afterDestroy: any = await client.callTool({ name: 'qsys_poll_change_group', arguments: { id: 'g' } });
   assert.ok(afterDestroy?.isError, 'polling a destroyed group errors');
@@ -138,6 +160,8 @@ async function main(): Promise<void> {
   assert.ok(/LIVE/.test(loadWarned.warning ?? ''), 'load_snapshot on a live Core returns a warning');
   const mixWarned = json(await call('qsys_mixer_set_input', { name: 'Mixer1', inputs: '1', op: 'gain', value: -6 }));
   assert.ok(/LIVE/.test(mixWarned.warning ?? ''), 'mixer write on a live Core returns a warning');
+  const lpWarned = json(await call('qsys_loop_player_start', { name: 'Player1', files: [{ name: 'x.wav', output: 1 }] }));
+  assert.ok(/LIVE/.test(lpWarned.warning ?? ''), 'loop player start on a live Core returns a warning');
 
   // Disconnect (from the live mock — clean, no reconnect storm)
   const disc = json(await call('qsys_disconnect'));
