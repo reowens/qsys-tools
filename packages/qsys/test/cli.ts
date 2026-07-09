@@ -154,6 +154,52 @@ async function main(): Promise<void> {
     ok('snapshot save/load round-trip');
   }
 
+  // -- mixer (write-only; assert exact wire mapping via the mock's lastMixerCall spy) --
+  {
+    const { code, text } = await run(['mixer', 'crosspoint', 'Mixer1', '1', '*', 'gain', '-6', '--ramp', '2']);
+    assert.equal(code, 0);
+    assert.deepEqual(emu.lastMixerCall(), {
+      method: 'Mixer.SetCrossPointGain',
+      params: { Name: 'Mixer1', Inputs: '1', Outputs: '*', Value: -6, Ramp: 2 },
+    });
+    assert.match(text, /crosspoint .*gain=-6 ramp=2s/);
+    ok('mixer crosspoint gain maps wire + ramp');
+  }
+  {
+    await run(['mixer', 'input', 'Mixer1', '4-6', 'mute', 'true']);
+    assert.deepEqual(emu.lastMixerCall(), {
+      method: 'Mixer.SetInputMute',
+      params: { Name: 'Mixer1', Inputs: '4-6', Value: true },
+    });
+    ok('mixer input mute maps wire (no ramp on a boolean op)');
+  }
+  {
+    await run(['mixer', 'cue-input', 'Mixer1', '1', '1-8 !3', 'enable', 'true']);
+    assert.deepEqual(emu.lastMixerCall(), {
+      method: 'Mixer.SetInputCueEnable',
+      params: { Name: 'Mixer1', Cues: '1', Inputs: '1-8 !3', Value: true },
+    });
+    ok('mixer cue-input enable passes the negation selector verbatim');
+  }
+  {
+    const { code, err } = await run(['mixer', 'crosspoint', 'Mixer1', '1', '1', 'gain', 'true']);
+    assert.equal(code, 2);
+    assert.match(err.join('\n'), /numeric value/);
+    ok('mixer gain rejects a boolean value');
+  }
+  {
+    const { code, err } = await run(['mixer', 'input', 'Mixer1', '1', 'mute', '3']);
+    assert.equal(code, 2);
+    assert.match(err.join('\n'), /boolean value/);
+    ok('mixer mute rejects a numeric value');
+  }
+  {
+    const { code, err } = await run(['mixer', 'input', 'Mixer1', '1', 'bogus', 'true']);
+    assert.equal(code, 2);
+    assert.match(err.join('\n'), /invalid op/);
+    ok('mixer rejects an invalid op');
+  }
+
   // -- watch: baseline + pushed change, abort ends the stream --
   {
     const abort = new AbortController();

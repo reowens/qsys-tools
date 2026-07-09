@@ -60,6 +60,8 @@ export class MockCore {
   private logons = 0;
   private snapLoadParams: unknown = null;
   private snapSaveParams: unknown = null;
+  /** Last Mixer.Set* call — recorded (not applied): wire-proof only, no grid fidelity here. */
+  private mixerCall: { method: string; params: unknown } | null = null;
 
   constructor(private readonly design: Design, opts: CoreOptions = {}) {
     this.strict = opts.strict ?? false;
@@ -110,6 +112,10 @@ export class MockCore {
   }
   lastSnapshotSave(): unknown {
     return this.snapSaveParams;
+  }
+  /** The last Mixer.Set* call this core acked ({ method, params }), or null if none. */
+  lastMixerCall(): { method: string; params: unknown } | null {
+    return this.mixerCall;
   }
   /** Simulate a Core restart losing its change groups. */
   resetChangeGroups(): void {
@@ -260,6 +266,24 @@ export class MockCore {
       case 'Snapshot.Save':
         this.snapSaveParams = msg.params;
         this.saveSnapshot(msg.params?.Name, String(msg.params?.Bank));
+        return reply(null);
+
+      // Mixer.Set* — deliberately thin: record the wire call + ack, no crosspoint-grid
+      // state, no selector expansion, no readback. That fidelity is the private moat.
+      case 'Mixer.SetCrossPointGain':
+      case 'Mixer.SetCrossPointDelay':
+      case 'Mixer.SetCrossPointMute':
+      case 'Mixer.SetCrossPointSolo':
+      case 'Mixer.SetInputGain':
+      case 'Mixer.SetInputMute':
+      case 'Mixer.SetInputSolo':
+      case 'Mixer.SetOutputGain':
+      case 'Mixer.SetOutputMute':
+      case 'Mixer.SetCueGain':
+      case 'Mixer.SetCueMute':
+      case 'Mixer.SetInputCueEnable':
+      case 'Mixer.SetInputCueAfl':
+        this.mixerCall = { method: msg.method, params: msg.params };
         return reply(null);
 
       default:

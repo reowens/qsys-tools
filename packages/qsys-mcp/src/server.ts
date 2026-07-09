@@ -37,6 +37,25 @@ function liveCoreWarning(): string | null {
 
 const controlValue = z.union([z.number(), z.string(), z.boolean()]);
 
+// Mixer value can be a dB/seconds number (gain/delay) or a boolean (mute/solo/enable/afl).
+// zod can't bind the value *type* to the `op` field, so tools accept the union and enforce
+// the op↔type pairing at runtime via guardMixerValue.
+const mixerValue = z.union([z.number(), z.boolean()]);
+const mixerSelectorHint =
+  'QRC String Syntax: "*" (all), "1 2 3"/"1,2,3" (list), "1-6" (range), "!3" (negate), combinable ("1-8 !3")';
+
+/** Ops whose value is a number (dB gain / seconds delay) and that accept an optional ramp. */
+const MIXER_NUMERIC_OPS = new Set(['gain', 'delay']);
+
+/** Enforce the op↔value-type binding zod can't express. Throws → caught by the handler's fail(). */
+function guardMixerValue(op: string, value: number | boolean): void {
+  if (MIXER_NUMERIC_OPS.has(op)) {
+    if (typeof value !== 'number') throw new Error(`Mixer op "${op}" requires a numeric value (dB/seconds), got ${typeof value}`);
+  } else if (typeof value !== 'boolean') {
+    throw new Error(`Mixer op "${op}" requires a boolean value, got ${typeof value}`);
+  }
+}
+
 /** Client-side trim — QRC has no server-side filter/pagination, so we shape the full response. */
 function shapeComponents(
   comps: QrcComponent[],
@@ -301,6 +320,177 @@ export function buildServer(): McpServer {
     async ({ bank, number }) => {
       try {
         return ok(await requireClient().snapshotSave(bank, number));
+      } catch (e) {
+        return fail((e as Error).message);
+      }
+    },
+  );
+
+  // ---- Mixer control (Mixer.Set*; write-only — read mixer state back via qsys_get_component) ----
+
+  server.registerTool(
+    'qsys_mixer_set_crosspoint',
+    {
+      title: 'Set mixer crosspoint(s)',
+      description:
+        'Set gain/delay (number, ramped) or mute/solo (boolean) on the crosspoints of an input×output selection ' +
+        '(Mixer.SetCrossPoint{Gain,Delay,Mute,Solo}). This MUTATES the running/emulated system. ' +
+        'Read mixer state back via qsys_get_component.',
+      inputSchema: {
+        name: z.string().describe('Mixer component name'),
+        inputs: z.string().describe(`Input selector — ${mixerSelectorHint}`),
+        outputs: z.string().describe(`Output selector — ${mixerSelectorHint}`),
+        op: z.enum(['gain', 'delay', 'mute', 'solo']).describe('Which crosspoint property to set'),
+        value: mixerValue.describe('Number (dB/seconds) for gain/delay; boolean for mute/solo'),
+        ramp: z.number().optional().describe('Ramp time in seconds — gain/delay only, ignored otherwise'),
+      },
+    },
+    async ({ name, inputs, outputs, op, value, ramp }) => {
+      try {
+        guardMixerValue(op, value);
+        const c = requireClient();
+        let result: unknown;
+        switch (op) {
+          case 'gain': result = await c.mixerSetCrossPointGain(name, inputs, outputs, value as number, ramp); break;
+          case 'delay': result = await c.mixerSetCrossPointDelay(name, inputs, outputs, value as number, ramp); break;
+          case 'mute': result = await c.mixerSetCrossPointMute(name, inputs, outputs, value as boolean); break;
+          case 'solo': result = await c.mixerSetCrossPointSolo(name, inputs, outputs, value as boolean); break;
+        }
+        const warning = liveCoreWarning();
+        return ok(warning ? { warning, result } : result);
+      } catch (e) {
+        return fail((e as Error).message);
+      }
+    },
+  );
+
+  server.registerTool(
+    'qsys_mixer_set_input',
+    {
+      title: 'Set mixer input(s)',
+      description:
+        'Set gain (number, ramped) or mute/solo (boolean) on selected mixer inputs ' +
+        '(Mixer.SetInput{Gain,Mute,Solo}). This MUTATES the running/emulated system. ' +
+        'Read mixer state back via qsys_get_component.',
+      inputSchema: {
+        name: z.string().describe('Mixer component name'),
+        inputs: z.string().describe(`Input selector — ${mixerSelectorHint}`),
+        op: z.enum(['gain', 'mute', 'solo']).describe('Which input property to set'),
+        value: mixerValue.describe('Number (dB) for gain; boolean for mute/solo'),
+        ramp: z.number().optional().describe('Ramp time in seconds — gain only, ignored otherwise'),
+      },
+    },
+    async ({ name, inputs, op, value, ramp }) => {
+      try {
+        guardMixerValue(op, value);
+        const c = requireClient();
+        let result: unknown;
+        switch (op) {
+          case 'gain': result = await c.mixerSetInputGain(name, inputs, value as number, ramp); break;
+          case 'mute': result = await c.mixerSetInputMute(name, inputs, value as boolean); break;
+          case 'solo': result = await c.mixerSetInputSolo(name, inputs, value as boolean); break;
+        }
+        const warning = liveCoreWarning();
+        return ok(warning ? { warning, result } : result);
+      } catch (e) {
+        return fail((e as Error).message);
+      }
+    },
+  );
+
+  server.registerTool(
+    'qsys_mixer_set_output',
+    {
+      title: 'Set mixer output(s)',
+      description:
+        'Set gain (number, ramped) or mute (boolean) on selected mixer outputs ' +
+        '(Mixer.SetOutput{Gain,Mute}). This MUTATES the running/emulated system. ' +
+        'Read mixer state back via qsys_get_component.',
+      inputSchema: {
+        name: z.string().describe('Mixer component name'),
+        outputs: z.string().describe(`Output selector — ${mixerSelectorHint}`),
+        op: z.enum(['gain', 'mute']).describe('Which output property to set'),
+        value: mixerValue.describe('Number (dB) for gain; boolean for mute'),
+        ramp: z.number().optional().describe('Ramp time in seconds — gain only, ignored otherwise'),
+      },
+    },
+    async ({ name, outputs, op, value, ramp }) => {
+      try {
+        guardMixerValue(op, value);
+        const c = requireClient();
+        let result: unknown;
+        switch (op) {
+          case 'gain': result = await c.mixerSetOutputGain(name, outputs, value as number, ramp); break;
+          case 'mute': result = await c.mixerSetOutputMute(name, outputs, value as boolean); break;
+        }
+        const warning = liveCoreWarning();
+        return ok(warning ? { warning, result } : result);
+      } catch (e) {
+        return fail((e as Error).message);
+      }
+    },
+  );
+
+  server.registerTool(
+    'qsys_mixer_set_cue',
+    {
+      title: 'Set mixer cue(s)',
+      description:
+        'Set gain (number, ramped) or mute (boolean) on selected mixer cues ' +
+        '(Mixer.SetCue{Gain,Mute}). This MUTATES the running/emulated system. ' +
+        'Read mixer state back via qsys_get_component.',
+      inputSchema: {
+        name: z.string().describe('Mixer component name'),
+        cues: z.string().describe('Cue selector (string specification of mixer cues)'),
+        op: z.enum(['gain', 'mute']).describe('Which cue property to set'),
+        value: mixerValue.describe('Number (dB) for gain; boolean for mute'),
+        ramp: z.number().optional().describe('Ramp time in seconds — gain only, ignored otherwise'),
+      },
+    },
+    async ({ name, cues, op, value, ramp }) => {
+      try {
+        guardMixerValue(op, value);
+        const c = requireClient();
+        let result: unknown;
+        switch (op) {
+          case 'gain': result = await c.mixerSetCueGain(name, cues, value as number, ramp); break;
+          case 'mute': result = await c.mixerSetCueMute(name, cues, value as boolean); break;
+        }
+        const warning = liveCoreWarning();
+        return ok(warning ? { warning, result } : result);
+      } catch (e) {
+        return fail((e as Error).message);
+      }
+    },
+  );
+
+  server.registerTool(
+    'qsys_mixer_set_cue_input',
+    {
+      title: 'Route/monitor input(s) to cue(s)',
+      description:
+        'Enable an input on a cue, or set its AFL (after-fade listen) flag (boolean) ' +
+        '(Mixer.SetInputCue{Enable,Afl}). This MUTATES the running/emulated system. ' +
+        'Read mixer state back via qsys_get_component.',
+      inputSchema: {
+        name: z.string().describe('Mixer component name'),
+        cues: z.string().describe('Cue selector (string specification of mixer cues)'),
+        inputs: z.string().describe(`Input selector — ${mixerSelectorHint}`),
+        op: z.enum(['enable', 'afl']).describe('Set cue-input enable, or AFL monitoring'),
+        value: mixerValue.describe('Boolean'),
+      },
+    },
+    async ({ name, cues, inputs, op, value }) => {
+      try {
+        guardMixerValue(op, value);
+        const c = requireClient();
+        let result: unknown;
+        switch (op) {
+          case 'enable': result = await c.mixerSetInputCueEnable(name, cues, inputs, value as boolean); break;
+          case 'afl': result = await c.mixerSetInputCueAfl(name, cues, inputs, value as boolean); break;
+        }
+        const warning = liveCoreWarning();
+        return ok(warning ? { warning, result } : result);
       } catch (e) {
         return fail((e as Error).message);
       }

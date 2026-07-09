@@ -21,6 +21,11 @@ const EXPECTED_TOOLS = [
   'qsys_set_component',
   'qsys_load_snapshot',
   'qsys_save_snapshot',
+  'qsys_mixer_set_crosspoint',
+  'qsys_mixer_set_input',
+  'qsys_mixer_set_output',
+  'qsys_mixer_set_cue',
+  'qsys_mixer_set_cue_input',
   'qsys_create_change_group',
   'qsys_poll_change_group',
   'qsys_change_group_add_component',
@@ -95,6 +100,31 @@ async function main(): Promise<void> {
   await call('qsys_save_snapshot', { bank: 'MyBank', number: 1 });
   await call('qsys_load_snapshot', { bank: 'MyBank', number: 1, ramp: 2 });
 
+  // Mixer tools reach the correct wire call (via the mock's recorded last-call spy)...
+  await call('qsys_mixer_set_crosspoint', { name: 'Mixer1', inputs: '1', outputs: '*', op: 'gain', value: -6, ramp: 2 });
+  assert.deepEqual(
+    mock.lastMixerCall(),
+    { method: 'Mixer.SetCrossPointGain', params: { Name: 'Mixer1', Inputs: '1', Outputs: '*', Value: -6, Ramp: 2 } },
+    'crosspoint gain tool emits the correct wire call',
+  );
+  await call('qsys_mixer_set_input', { name: 'Mixer1', inputs: '4-6', op: 'mute', value: true });
+  assert.deepEqual(
+    mock.lastMixerCall(),
+    { method: 'Mixer.SetInputMute', params: { Name: 'Mixer1', Inputs: '4-6', Value: true } },
+    'input mute tool emits the correct wire call (no Ramp on a boolean op)',
+  );
+  // ...and the value-type guard rejects op↔value-type mismatches before hitting the wire.
+  const badGain: any = await client.callTool({
+    name: 'qsys_mixer_set_crosspoint',
+    arguments: { name: 'Mixer1', inputs: '1', outputs: '1', op: 'gain', value: true },
+  });
+  assert.ok(badGain?.isError && /numeric/.test(text(badGain)), 'gain op rejects a boolean value');
+  const badMute: any = await client.callTool({
+    name: 'qsys_mixer_set_input',
+    arguments: { name: 'Mixer1', inputs: '1', op: 'mute', value: 3 },
+  });
+  assert.ok(badMute?.isError && /boolean/.test(text(badMute)), 'mute op rejects a numeric value');
+
   await call('qsys_destroy_change_group', { id: 'g' });
   const afterDestroy: any = await client.callTool({ name: 'qsys_poll_change_group', arguments: { id: 'g' } });
   assert.ok(afterDestroy?.isError, 'polling a destroyed group errors');
@@ -106,6 +136,8 @@ async function main(): Promise<void> {
   assert.ok(/LIVE/.test(setWarned.warning ?? ''), 'set_control on a live Core returns a warning');
   const loadWarned = json(await call('qsys_load_snapshot', { bank: 'B', number: 1 }));
   assert.ok(/LIVE/.test(loadWarned.warning ?? ''), 'load_snapshot on a live Core returns a warning');
+  const mixWarned = json(await call('qsys_mixer_set_input', { name: 'Mixer1', inputs: '1', op: 'gain', value: -6 }));
+  assert.ok(/LIVE/.test(mixWarned.warning ?? ''), 'mixer write on a live Core returns a warning');
 
   // Disconnect (from the live mock — clean, no reconnect storm)
   const disc = json(await call('qsys_disconnect'));

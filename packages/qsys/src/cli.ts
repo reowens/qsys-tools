@@ -29,6 +29,11 @@ commands:
   watch [--component <comp>] <ctrl...> [--interval <s>]   stream changes until Ctrl-C
   snapshot load <bank> <slot> [--ramp <s>]          recall a snapshot
   snapshot save <bank> <slot>                       save a snapshot
+  mixer crosspoint <comp> <in> <out> <op> <value> [--ramp <s>]  op: gain|delay|mute|solo
+  mixer input <comp> <in> <op> <value> [--ramp <s>]             op: gain|mute|solo
+  mixer output <comp> <out> <op> <value> [--ramp <s>]           op: gain|mute
+  mixer cue <comp> <cues> <op> <value> [--ramp <s>]             op: gain|mute
+  mixer cue-input <comp> <cues> <in> <op> <value>               op: enable|afl
 
 connection:
   --host <ip>        Core/emulator address (or QSYS_HOST)
@@ -40,7 +45,10 @@ output:
   --json             machine-readable output (watch emits JSON lines)
 
 values: true/false → boolean, numeric → number, anything else → string.
-Negative values work as-is: qsys set MainGain -6`;
+Negative values work as-is: qsys set MainGain -6
+mixer selectors use QRC String Syntax (* all, "1 2 3" list, 1-6 range, !3 negate); quote
+selectors and * so the shell doesn't split/glob them. Gain/delay take a number (+ optional
+--ramp); mute/solo/enable/afl take true/false. Read mixer state back with get-component.`;
 
 /** Flags taking a value; everything else that starts with `--` must be boolean. */
 const STRING_FLAGS = new Set([
@@ -233,6 +241,9 @@ export async function runCli(
         return 0;
       }
 
+      case 'mixer':
+        return await mixerCommand(client, rest, flags, json, io);
+
       case 'watch':
         return await watch(client, rest, flags, json, io);
 
@@ -255,6 +266,109 @@ export async function runCli(
 function printControls(io: CliIo, controls: QrcControl[], json: boolean): void {
   if (json) io.out(JSON.stringify(controls, null, 2));
   else io.out(renderTable(CONTROL_HEADER, controls.map(controlRow)));
+}
+
+/** Ops whose value is a number (dB gain / seconds delay) and that accept an optional ramp. */
+const MIXER_NUMERIC_OPS = new Set(['gain', 'delay']);
+
+/** Coerce + enforce the op↔value-type pairing (gain/delay → number, else boolean). Mirrors the
+ *  MCP server's guardMixerValue; kept local so qsys-cli stays decoupled from qsys-mcp. */
+function mixerValue(op: string, raw: string): number | boolean {
+  const v = coerceValue(raw);
+  if (MIXER_NUMERIC_OPS.has(op)) {
+    if (typeof v !== 'number') throw new UsageError(`mixer ${op} needs a numeric value (dB/seconds), got "${raw}"`);
+    return v;
+  }
+  if (typeof v !== 'boolean') throw new UsageError(`mixer ${op} needs a boolean value (true/false), got "${raw}"`);
+  return v;
+}
+
+function mixerOp(op: string, allowed: string[]): string {
+  if (!allowed.includes(op)) throw new UsageError(`mixer: invalid op "${op}" (expected ${allowed.join('|')})`);
+  return op;
+}
+
+function emitMixer(io: CliIo, json: boolean, target: string, comp: string, fields: Record<string, unknown>): number {
+  if (json) {
+    io.out(JSON.stringify({ ok: true, target, name: comp, ...fields }, null, 2));
+    return 0;
+  }
+  const sel: string[] = [];
+  if (fields.inputs != null) sel.push(`in=${fields.inputs}`);
+  if (fields.outputs != null) sel.push(`out=${fields.outputs}`);
+  if (fields.cues != null) sel.push(`cue=${fields.cues}`);
+  const ramp = fields.ramp != null ? ` ramp=${fields.ramp}s` : '';
+  io.out(`mixer ${target} "${comp}" ${sel.join(' ')} ${fields.op}=${String(fields.value)}${ramp}`.replace(/\s+/g, ' '));
+  return 0;
+}
+
+/**
+ * `qsys mixer <target> …` — mirrors the 5 grouped MCP mixer tools. Write-only (no Mixer.Get on
+ * the wire); prints a confirmation line and points at get-component for readback. Selectors are
+ * QRC String Syntax strings passed through verbatim (quote spaces/`*` in the shell).
+ */
+async function mixerCommand(
+  client: QrcClient,
+  rest: string[],
+  flags: Record<string, string | boolean>,
+  json: boolean,
+  io: CliIo,
+): Promise<number> {
+  const target = rest[0];
+  const a = rest.slice(1);
+  const ramp = numFlag(flags.ramp, 'ramp');
+  switch (target) {
+    case 'crosspoint': {
+      need(a, 5, 'qsys mixer crosspoint <comp> <inputs> <outputs> <gain|delay|mute|solo> <value> [--ramp <s>]');
+      const [comp, inputs, outputs, opRaw, raw] = a;
+      const op = mixerOp(opRaw, ['gain', 'delay', 'mute', 'solo']);
+      const value = mixerValue(op, raw);
+      if (op === 'gain') await client.mixerSetCrossPointGain(comp, inputs, outputs, value as number, ramp);
+      else if (op === 'delay') await client.mixerSetCrossPointDelay(comp, inputs, outputs, value as number, ramp);
+      else if (op === 'mute') await client.mixerSetCrossPointMute(comp, inputs, outputs, value as boolean);
+      else await client.mixerSetCrossPointSolo(comp, inputs, outputs, value as boolean);
+      return emitMixer(io, json, 'crosspoint', comp, { inputs, outputs, op, value, ramp });
+    }
+    case 'input': {
+      need(a, 4, 'qsys mixer input <comp> <inputs> <gain|mute|solo> <value> [--ramp <s>]');
+      const [comp, inputs, opRaw, raw] = a;
+      const op = mixerOp(opRaw, ['gain', 'mute', 'solo']);
+      const value = mixerValue(op, raw);
+      if (op === 'gain') await client.mixerSetInputGain(comp, inputs, value as number, ramp);
+      else if (op === 'mute') await client.mixerSetInputMute(comp, inputs, value as boolean);
+      else await client.mixerSetInputSolo(comp, inputs, value as boolean);
+      return emitMixer(io, json, 'input', comp, { inputs, op, value, ramp });
+    }
+    case 'output': {
+      need(a, 4, 'qsys mixer output <comp> <outputs> <gain|mute> <value> [--ramp <s>]');
+      const [comp, outputs, opRaw, raw] = a;
+      const op = mixerOp(opRaw, ['gain', 'mute']);
+      const value = mixerValue(op, raw);
+      if (op === 'gain') await client.mixerSetOutputGain(comp, outputs, value as number, ramp);
+      else await client.mixerSetOutputMute(comp, outputs, value as boolean);
+      return emitMixer(io, json, 'output', comp, { outputs, op, value, ramp });
+    }
+    case 'cue': {
+      need(a, 4, 'qsys mixer cue <comp> <cues> <gain|mute> <value> [--ramp <s>]');
+      const [comp, cues, opRaw, raw] = a;
+      const op = mixerOp(opRaw, ['gain', 'mute']);
+      const value = mixerValue(op, raw);
+      if (op === 'gain') await client.mixerSetCueGain(comp, cues, value as number, ramp);
+      else await client.mixerSetCueMute(comp, cues, value as boolean);
+      return emitMixer(io, json, 'cue', comp, { cues, op, value, ramp });
+    }
+    case 'cue-input': {
+      need(a, 5, 'qsys mixer cue-input <comp> <cues> <inputs> <enable|afl> <value>');
+      const [comp, cues, inputs, opRaw, raw] = a;
+      const op = mixerOp(opRaw, ['enable', 'afl']);
+      const value = mixerValue(op, raw);
+      if (op === 'enable') await client.mixerSetInputCueEnable(comp, cues, inputs, value as boolean);
+      else await client.mixerSetInputCueAfl(comp, cues, inputs, value as boolean);
+      return emitMixer(io, json, 'cue-input', comp, { cues, inputs, op, value });
+    }
+    default:
+      throw new UsageError(`unknown mixer target: ${target ?? '(none)'} (expected crosspoint|input|output|cue|cue-input)`);
+  }
 }
 
 /**
