@@ -34,6 +34,7 @@ die()  { printf '\033[1;31m[qsys] ERROR:\033[0m %s\n' "$*" >&2; exit 1; }
 
 wine_bin() { printf '%s' "$DATA_DIR/Wine Staging.app/Contents/Resources/wine/bin/wine"; }
 ws_bin()   { printf '%s' "$DATA_DIR/Wine Staging.app/Contents/Resources/wine/bin/wineserver"; }
+wine_bin_dir() { printf '%s' "$DATA_DIR/Wine Staging.app/Contents/Resources/wine/bin/"; }
 
 # Provisioned == the marker is written AND wine is runnable AND a Designer.exe is in the prefix.
 provisioned() {
@@ -115,8 +116,8 @@ cmd_remove() {
   # Stop Designer/Wine bound to our prefix BEFORE unlinking, else wineserver orphans off the
   # deleted tree (matches Uninstaller.remove): graceful server shutdown, then TERM → grace → KILL.
   [ -x "$(ws_bin)" ] && WINEPREFIX="$DATA_DIR/prefix" "$(ws_bin)" -k >/dev/null 2>&1
-  if [ -d "$DATA_DIR" ]; then
-    pkill -f "$DATA_DIR" 2>/dev/null; sleep 0.5; pkill -9 -f "$DATA_DIR" 2>/dev/null
+  if [ -d "$(wine_bin_dir)" ]; then
+    pkill -f "$(wine_bin_dir)" 2>/dev/null; sleep 0.5; pkill -9 -f "$(wine_bin_dir)" 2>/dev/null
   fi
   local p any=0
   for p in "$DATA_DIR" "/Applications/$APP_NAME" "$HOME/Applications/$APP_NAME"; do
@@ -135,7 +136,7 @@ cmd_status() {
   fi
   local app
   if app="$(installed_app)"; then printf 'app         : %s\n' "$app"; else printf 'app         : (not placed)\n'; fi
-  if pgrep -f "$DATA_DIR" >/dev/null 2>&1; then printf 'running     : yes\n'; else printf 'running     : no\n'; fi
+  if [ -d "$(wine_bin_dir)" ] && pgrep -f "$(wine_bin_dir)" >/dev/null 2>&1; then printf 'running     : yes\n'; else printf 'running     : no\n'; fi
 }
 
 bool() { [ "$1" = "0" ] && printf 'yes' || printf 'no'; }
@@ -246,7 +247,7 @@ cmd_doctor() {
   else
     printf '  %-22s : not placed\n' 'App path'
   fi
-  if pgrep -f "$DATA_DIR" >/dev/null 2>&1; then running=yes; else running=no; fi
+  if [ -d "$(wine_bin_dir)" ] && pgrep -f "$(wine_bin_dir)" >/dev/null 2>&1; then running=yes; else running=no; fi
   printf '  %-22s : %s\n' 'Running' "$running"
 
   printf '\nLogs\n'

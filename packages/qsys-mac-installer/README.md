@@ -48,7 +48,7 @@ you are done. The installed Designer app and its Application Support data remain
 installer app.
 
 Direct signed-DMG path: download
-[`qsys-mac-installer.dmg`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.4),
+[`qsys-mac-installer.dmg`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.6),
 open `Q-SYS Mac Installer.app`, and drop your Q-SYS Designer installer into the window for a fresh
 install or explicit reinstall.
 
@@ -165,11 +165,24 @@ errors with partial-state cleanup + resume.
 native helpers by default; set `QSYS_ASSEMBLE_MSI=/path/to/qsys-assemble-msi` or
 `QSYS_RENAME_FONT_FAMILY=/path/to/qsys-rename-font-family` to override them. Python is now an
 explicit developer fallback only: set `QSYS_USE_PYTHON_HELPERS=1` when comparing/debugging the old
-helper scripts. Validate parity with:
+helper scripts. Run local validation with:
+
+```sh
+scripts/test.sh
+```
+
+Run a real isolated provision/launch smoke with your own Q-SYS Designer installer:
+
+```sh
+scripts/smoke-provision.sh "/path/to/Q-SYS Designer Installer 10.4.0.exe"
+```
+
+Validate helper parity with:
 
 ```sh
 scripts/compare-assemble-msi.sh "/path/to/Q-SYS Designer Installer 10.4.0.exe"
 scripts/compare-rename-font-family.sh
+scripts/test-process-cleanup.sh
 ```
 
 ## Distribution — signed & notarized `.dmg`
@@ -364,7 +377,7 @@ provision.sh     provision the recipe into a data dir (no .app emit; used by the
 launch.sh        run a built prefix directly (dev/debug)
 lib/recipe.sh    the recipe — wine, .NET, content-discovery, assembly, .app emit
 app/             native macOS Swift app (setup UI + launcher) — xcodegen project
-scripts/         bundle-deps.sh (Tier-B offline deps) · package.sh (sign + notarize + dmg)
+scripts/         bundle-deps.sh (Tier-B offline deps) · package.sh (sign + notarize + dmg) · test.sh · smoke-provision.sh
 THIRD-PARTY-NOTICES.md   bundled-dep licenses + icoutils GPLv3 source offer (ships in the dmg)
 ```
 

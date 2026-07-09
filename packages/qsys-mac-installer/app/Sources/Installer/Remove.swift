@@ -32,6 +32,7 @@ enum Uninstaller {
         // — a grep, an editor with the folder open, `tail wine.log`. Only processes we actually
         // launched carry the wine bin path in their argv. TERM, brief grace, then KILL.
         if fm.fileExists(atPath: DataDir.root) {
+            _ = run(DataDir.wineserver, ["-k"], environment: ["WINEPREFIX": DataDir.prefix])
             let wineBin = "\(DataDir.wineApp)/Contents/Resources/wine/bin/"
             _ = run("/usr/bin/pkill", ["-f", wineBin])
             Thread.sleep(forTimeInterval: 0.5)
@@ -52,10 +53,15 @@ enum Uninstaller {
     }
 
     @discardableResult
-    private static func run(_ tool: String, _ args: [String]) -> Int32 {
+    private static func run(_ tool: String, _ args: [String], environment extraEnv: [String: String] = [:]) -> Int32 {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: tool)
         p.arguments = args
+        if !extraEnv.isEmpty {
+            var env = ProcessInfo.processInfo.environment
+            for (key, value) in extraEnv { env[key] = value }
+            p.environment = env
+        }
         p.standardOutput = FileHandle.nullDevice
         p.standardError = FileHandle.nullDevice
         do { try p.run(); p.waitUntilExit(); return p.terminationStatus } catch { return -1 }

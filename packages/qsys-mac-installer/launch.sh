@@ -35,6 +35,7 @@ patch_loader_bundle_name "$WINEDIR"
 export QSYS_MENU_NAME="$APP_NAME"
 SHIM="$WRAP_HOME/appmenu.dylib"
 compile_app_menu_shim "$SHIM" && export DYLD_INSERT_LIBRARIES="$SHIM"
+start_wine_reaper "$$"
 
 # Opt-in debug logging. `QSYS_DEBUG=1 ./launch.sh` cranks Wine diagnostics — all errors +
 # warnings + SEH exception traces (so a raised managed exception like 0xe0434352 and any

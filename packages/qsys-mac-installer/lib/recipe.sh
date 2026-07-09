@@ -107,7 +107,7 @@ run_dotnet_installer() {  # $1 = human label  $2 = installer path
     if [ "$elapsed" -ge "$timeout" ]; then
       warn "$label runtime installer did not exit after ${timeout}s; stopping Wine for this prefix."
       [ -x "$WINEDIR/bin/wineserver" ] && "$WINEDIR/bin/wineserver" -k >/dev/null 2>&1 || true
-      kill "$pid" 2>/dev/null || true
+      kill_process_tree "$pid"
       wait "$pid" 2>/dev/null || true
       rm -f "$status_file"
       return 124
@@ -121,6 +121,42 @@ run_dotnet_installer() {  # $1 = human label  $2 = installer path
   rm -f "$status_file"
   case "$status" in ''|*[!0-9]*) return 1 ;; esac
   return "$status"
+}
+
+process_tree_pids() {  # $1 = root pid; prints descendants first, then root
+  local root="$1" child
+  [ -n "$root" ] || return 0
+  while IFS= read -r child; do
+    [ -n "$child" ] && process_tree_pids "$child"
+  done < <(/usr/bin/pgrep -P "$root" 2>/dev/null || true)
+  printf '%s\n' "$root"
+}
+
+kill_process_tree() {  # $1 = root pid; TERM then KILL the original descendants so none orphan
+  local root="$1" pids pid
+  [ -n "$root" ] || return 0
+  pids="$(process_tree_pids "$root")"
+  while IFS= read -r pid; do
+    [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+  done <<<"$pids"
+  sleep 0.5
+  while IFS= read -r pid; do
+    [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null || true
+  done <<<"$pids"
+}
+
+stop_wine_for_prefix() {
+  [ -x "$WINEDIR/bin/wineserver" ] && WINEPREFIX="$WINEPREFIX" "$WINEDIR/bin/wineserver" -k >/dev/null 2>&1 || true
+}
+
+start_wine_reaper() {  # $1 = watched pid; runs wineserver -k after that pid exits
+  local watched="$1" wineserver="${2:-$WINEDIR/bin/wineserver}" prefix="${WINEPREFIX:-}"
+  [ -n "$watched" ] || return 0
+  (
+    trap '' INT TERM HUP
+    while kill -0 "$watched" 2>/dev/null; do sleep 1; done
+    [ -x "$wineserver" ] && WINEPREFIX="$prefix" "$wineserver" -k >/dev/null 2>&1 || true
+  ) >/dev/null 2>&1 &
 }
 
 native_helper_path() {  # $1 = override env var name  $2 = command name
@@ -643,8 +679,8 @@ emit_app() {
   <key>CFBundleName</key><string>$APP_NAME</string>
   <key>CFBundleDisplayName</key><string>$APP_NAME</string>
   <key>CFBundleIdentifier</key><string>com.byo.qsys-designer-wine</string>
-  <key>CFBundleShortVersionString</key><string>0.1.5</string>
-  <key>CFBundleVersion</key><string>0.1.5</string>
+  <key>CFBundleShortVersionString</key><string>0.1.6</string>
+  <key>CFBundleVersion</key><string>0.1.6</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>launch</string>
   <key>CFBundleIconFile</key><string>QSYSDesigner</string>
@@ -671,6 +707,15 @@ export WINEDLLOVERRIDES="mshtml=d;mountmgr.sys=d"
 export QSYS_MENU_NAME="$APP_NAME"
 export QSYS_ICON="\$RES/QSYSDesigner.icns"
 [ -f "\$RES/appmenu.dylib" ] && export DYLD_INSERT_LIBRARIES="\$RES/appmenu.dylib"
+start_reaper() {
+  local watched="\$\$" wineserver="\$RES/wine/bin/wineserver" prefix="\$WINEPREFIX"
+  (
+    trap '' INT TERM HUP
+    while kill -0 "\$watched" 2>/dev/null; do sleep 1; done
+    [ -x "\$wineserver" ] && WINEPREFIX="\$prefix" "\$wineserver" -k >/dev/null 2>&1 || true
+  ) >/dev/null 2>&1 &
+}
+start_reaper
 # Opt-in debug logging. Enable by env (terminal launch: QSYS_DEBUG=1 …/Contents/MacOS/launch)
 # or by a marker file (double-click: \`touch "\$HOME/Library/Logs/qsys-designer-debug"\`). Cranks
 # Wine diagnostics (errors + warnings + SEH exception traces; fixmes off) and tees ALL output

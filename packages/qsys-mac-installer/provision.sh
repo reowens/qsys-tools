@@ -67,9 +67,10 @@ cleanup_partial() {
 
 on_exit() {
   local rc=$?
-  [ -n "${EXTRACT_PID:-}" ] && kill "$EXTRACT_PID" 2>/dev/null || true
+  [ -n "${EXTRACT_PID:-}" ] && kill_process_tree "$EXTRACT_PID" || true
   if [ "$DONE" -ne 1 ]; then
     warn "provisioning did not finish (exit $rc) — cleaning up partial '$CURRENT_STEP' state."
+    stop_wine_for_prefix
     cleanup_partial
   fi
 }
@@ -87,6 +88,7 @@ mkdir -p "$WRAP_HOME"
 
 if [ "${FULL_WIPE:-0}" = "1" ]; then
   say "FULL_WIPE=1 — clearing prior provisioning state (cache kept)…"
+  stop_wine_for_prefix
   rm -rf "$WINEPREFIX" "$WINE_APP" "$WRAP_HOME/extract" \
          "$WRAP_HOME/.provisioned" "$WRAP_HOME/appmenu.dylib" "$WRAP_HOME/QSYSDesigner.icns"
 fi
@@ -135,6 +137,7 @@ extract_app_icon "$WRAP_HOME/QSYSDesigner.icns" || warn "icon extraction failed 
 # clearing quarantine here is correct (same reason Wine's own dylibs need it).
 say "Preparing the installed runtime for first launch…"
 xattr -dr com.apple.quarantine "$WRAP_HOME" 2>/dev/null || true
+stop_wine_for_prefix
 
 # Schema stamp BEFORE the .provisioned marker: a kill between the two writes leaves an
 # unstamped-but-unmarked dir (re-provisions), never a marked dir the launcher would trust

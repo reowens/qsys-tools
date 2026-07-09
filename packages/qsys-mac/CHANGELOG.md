@@ -6,6 +6,12 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-07-09
+
+### Changed
+
+- `DEFAULT_RELEASE` now points at the `qsys-mac-installer 0.1.6` signed DMG.
+
 ## [0.1.5] - 2026-07-08
 
 ### Changed
@@ -47,6 +53,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   Designer or app payload — you supply your own free Designer installer download.
 
 [Unreleased]: https://github.com/reowens/qsys-tools/tree/main/packages/qsys-mac
+[0.1.6]: https://www.npmjs.com/package/qsys-mac/v/0.1.6
 [0.1.5]: https://www.npmjs.com/package/qsys-mac/v/0.1.5
 [0.1.4]: https://www.npmjs.com/package/qsys-mac/v/0.1.4
 [0.1.3]: https://www.npmjs.com/package/qsys-mac/v/0.1.3

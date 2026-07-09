@@ -82,17 +82,18 @@ final class Provisioner: ObservableObject {
         }
     }
 
-    /// Cancel an in-flight provision. SIGTERM lets provision.sh's trap kill the running 7z and
-    /// scrub the in-flight step's partial state, so the next attempt resumes clean. If the script
-    /// ignores TERM (a wedged 7z, say) and is still up after a short grace, escalate to SIGKILL so
-    /// a cancel can never hang the UI.
+    /// Cancel an in-flight provision. SIGTERM lets provision.sh's trap scrub the in-flight step's
+    /// partial state, and signalling the full child tree prevents a wedged Wine/7z child from being
+    /// orphaned if the wrapper shell exits first. After a short grace, SIGKILL the same snapshot.
     func cancel() {
         guard state == .running, let proc = proc else { return }
         wasCancelled = true
-        proc.terminate()
+        let pid = proc.processIdentifier
+        let tree = Self.processTreePids(root: pid)
+        Self.signal(pids: tree, signal: SIGTERM)
         DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 3) { [weak proc] in
-            guard let proc, proc.isRunning else { return }
-            kill(proc.processIdentifier, SIGKILL)
+            let latestTree = proc?.isRunning == true ? Self.processTreePids(root: pid) : []
+            Self.signal(pids: tree + latestTree, signal: SIGKILL)
         }
     }
 
@@ -161,5 +162,31 @@ final class Provisioner: ObservableObject {
         let r = NSRange(s.startIndex..., in: s)
         return ansi.stringByReplacingMatches(in: s, range: r, withTemplate: "")
             .replacingOccurrences(of: "\r", with: "")
+    }
+
+    private static func processTreePids(root: pid_t) -> [pid_t] {
+        var pids: [pid_t] = []
+        for child in childPids(of: root) { pids += processTreePids(root: child) }
+        pids.append(root)
+        return pids
+    }
+
+    private static func childPids(of pid: pid_t) -> [pid_t] {
+        let proc = Process()
+        let pipe = Pipe()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+        proc.arguments = ["-P", String(pid)]
+        proc.standardOutput = pipe
+        proc.standardError = FileHandle.nullDevice
+        do { try proc.run() } catch { return [] }
+        proc.waitUntilExit()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let raw = String(data: data, encoding: .utf8) ?? ""
+        return raw.split(whereSeparator: \.isNewline).compactMap { pid_t($0) }
+    }
+
+    private static func signal(pids: [pid_t], signal: Int32) {
+        var seen = Set<pid_t>()
+        for pid in pids where pid > 1 && seen.insert(pid).inserted { kill(pid, signal) }
     }
 }

@@ -39,6 +39,13 @@ done
 # shellcheck source=lib/recipe.sh
 source "$HERE/lib/recipe.sh"
 
+DONE=0
+on_exit() {
+  [ "$DONE" -eq 1 ] || stop_wine_for_prefix
+}
+trap 'exit 130' INT TERM
+trap on_exit EXIT
+
 [ -n "$INSTALLER" ] || die "Pass --installer <path to your Q-SYS Designer Installer*.exe>. See --help."
 
 say "Q-SYS Designer macOS BYO wrapper"
@@ -54,5 +61,7 @@ extract_installer "$INSTALLER"
 assemble
 apply_prefix_tweaks
 check_hosts
+stop_wine_for_prefix
 emit_app
+DONE=1
 print_postscript

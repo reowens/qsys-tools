@@ -217,13 +217,25 @@ enum DataDir {
     /// Designer's process exits — clean quit OR crash. The durable teardown: even a hung Designer
     /// gets killed instead of orphaning to PPID 1. `wineserver -k` signals the whole prefix tree.
     static func teardownWine() {
-        guard FileManager.default.isExecutableFile(atPath: wineserver) else { return }
+        if FileManager.default.isExecutableFile(atPath: wineserver) {
+            runQuietly(wineserver, ["-k"], environment: ["WINEPREFIX": prefix])
+        }
+        let wineBin = "\(wineApp)/Contents/Resources/wine/bin/"
+        guard FileManager.default.fileExists(atPath: wineBin) else { return }
+        runQuietly("/usr/bin/pkill", ["-f", wineBin])
+        Thread.sleep(forTimeInterval: 0.5)
+        runQuietly("/usr/bin/pkill", ["-9", "-f", wineBin])
+    }
+
+    private static func runQuietly(_ tool: String, _ args: [String], environment extraEnv: [String: String] = [:]) {
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: wineserver)
-        p.arguments = ["-k"]
-        var env = ProcessInfo.processInfo.environment
-        env["WINEPREFIX"] = prefix
-        p.environment = env
+        p.executableURL = URL(fileURLWithPath: tool)
+        p.arguments = args
+        if !extraEnv.isEmpty {
+            var env = ProcessInfo.processInfo.environment
+            for (key, value) in extraEnv { env[key] = value }
+            p.environment = env
+        }
         p.standardOutput = FileHandle.nullDevice
         p.standardError = FileHandle.nullDevice
         try? p.run(); p.waitUntilExit()
