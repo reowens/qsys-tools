@@ -184,8 +184,15 @@ After publishing a new installer DMG, update the external Homebrew tap at
 `reowens/homebrew-qsys`:
 
 ```sh
+packages/qsys-mac-installer/scripts/update-homebrew-cask.sh ../homebrew-qsys
+git -C ../homebrew-qsys diff -- Casks/qsys-mac-installer.rb
+git -C ../homebrew-qsys add Casks/qsys-mac-installer.rb
+git -C ../homebrew-qsys commit -m "Update qsys-mac-installer to X.Y.Z"
+git -C ../homebrew-qsys push origin main
+
 brew tap reowens/qsys
 brew trust reowens/qsys
+brew fetch --cask qsys-mac-installer --force
 brew audit --cask --online reowens/qsys/qsys-mac-installer
 brew install --cask qsys-mac-installer
 brew uninstall --cask qsys-mac-installer

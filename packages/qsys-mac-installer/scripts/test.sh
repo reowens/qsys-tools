@@ -20,7 +20,8 @@ bash -n \
   "$ROOT/qsys-mac" \
   "$ROOT/scripts/smoke-provision.sh" \
   "$ROOT/scripts/test-process-cleanup.sh" \
-  "$ROOT/scripts/test.sh"
+  "$ROOT/scripts/test.sh" \
+  "$ROOT/scripts/update-homebrew-cask.sh"
 
 if git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   say "checking diff whitespace"

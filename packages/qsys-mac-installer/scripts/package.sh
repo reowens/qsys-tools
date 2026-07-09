@@ -195,4 +195,10 @@ if [ "$REAL" -eq 1 ]; then
 fi
 
 say "Done → $DMG"
+if [ -f "$DMG" ]; then
+  VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APPDIR/Info.plist" 2>/dev/null || printf 'unknown')"
+  SHA="$(shasum -a 256 "$DMG" 2>/dev/null | awk '{print $1}')"
+  say "Release metadata: qsys-mac-installer $VERSION sha256 $SHA"
+  say "Next: scripts/update-homebrew-cask.sh /path/to/homebrew-qsys"
+fi
 [ "$REAL" -eq 1 ] || say "That was a DRY run. Re-run with DEV_ID + NOTARY_PROFILE set to produce a shippable, notarized dmg."
