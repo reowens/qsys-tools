@@ -31,6 +31,8 @@ export interface MockCoreHandle {
   logonCount: () => number;
   lastSnapshotLoad: () => unknown;
   lastSnapshotSave: () => unknown;
+  /** The last Mixer.Set* call the core acked ({ method, params }), or null. */
+  lastMixerCall: () => { method: string; params: unknown } | null;
   /** The underlying engine (introspection for tests). */
   core: MockCore;
 }
@@ -149,6 +151,7 @@ export function startMockCore(design: Design, opts: MockCoreOptions = {}): Promi
         logonCount: () => core.logonCount(),
         lastSnapshotLoad: () => core.lastSnapshotLoad(),
         lastSnapshotSave: () => core.lastSnapshotSave(),
+        lastMixerCall: () => core.lastMixerCall(),
         core,
       });
     });

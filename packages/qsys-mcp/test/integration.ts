@@ -95,6 +95,33 @@ async function main(): Promise<void> {
   await client.snapshotLoad('OtherBank', 2);
   assert.deepEqual(mock.lastSnapshotLoad(), { Name: 'OtherBank', Bank: 2 }, 'load omits Ramp when not given');
 
+  // Mixer.Set* — the wrappers' whole job is wire mapping, so assert the exact method + params.
+  // (The mock records but does not apply the call — crosspoint-grid fidelity is the private moat.)
+  await client.mixerSetCrossPointGain('Mixer1', '*', '*', -100, 5); // documented example: -100dB over 5s
+  assert.deepEqual(
+    mock.lastMixerCall(),
+    { method: 'Mixer.SetCrossPointGain', params: { Name: 'Mixer1', Inputs: '*', Outputs: '*', Value: -100, Ramp: 5 } },
+    'crosspoint gain maps Inputs/Outputs/Value/Ramp (documented example)',
+  );
+  await client.mixerSetInputGain('Mixer1', '1-3', -3); // ramp omitted
+  assert.deepEqual(
+    mock.lastMixerCall(),
+    { method: 'Mixer.SetInputGain', params: { Name: 'Mixer1', Inputs: '1-3', Value: -3 } },
+    'input gain omits Ramp when not supplied',
+  );
+  await client.mixerSetInputMute('Mixer1', '4-6', true); // documented example; boolean op → no Ramp
+  assert.deepEqual(
+    mock.lastMixerCall(),
+    { method: 'Mixer.SetInputMute', params: { Name: 'Mixer1', Inputs: '4-6', Value: true } },
+    'input mute (documented example) carries no Ramp',
+  );
+  await client.mixerSetInputCueEnable('Mixer1', '1', '1-8 !3', true);
+  assert.deepEqual(
+    mock.lastMixerCall(),
+    { method: 'Mixer.SetInputCueEnable', params: { Name: 'Mixer1', Cues: '1', Inputs: '1-8 !3', Value: true } },
+    'cue-input enable maps Cues + Inputs (negation selector passes through verbatim)',
+  );
+
   // Destroy frees the group (ChangeGroup.Destroy)
   await client.changeGroupDestroy('cg2');
   await assert.rejects(() => client.changeGroupPoll('cg2'), /Unknown change group/);

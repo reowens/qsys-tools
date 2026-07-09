@@ -450,6 +450,74 @@ export class QrcClient extends EventEmitter {
     return this.send('Snapshot.Save', { Name: bank, Bank: number });
   }
 
+  // ---- Mixer.Set* (write-only; no Mixer.Get* exists — read state back via Component.Get) ----
+  // Selectors are QRC String Syntax strings: '*', '1 2 3'/'1,2,3', '1-6', '!3', combinable
+  // ('1-8 !3', '* !3-5'). `Ramp` (seconds) applies to gain/delay only. Note: `Cues` is
+  // documented only as a "string specification of mixer cues" — unlike Inputs/Outputs it is
+  // not cross-referenced to String Syntax, so treat cue range/negation as unverified.
+
+  mixerSetCrossPointGain(name: string, inputs: string, outputs: string, value: number, ramp?: number): Promise<unknown> {
+    const params: Record<string, unknown> = { Name: name, Inputs: inputs, Outputs: outputs, Value: value };
+    if (ramp != null) params.Ramp = ramp;
+    return this.send('Mixer.SetCrossPointGain', params);
+  }
+
+  mixerSetCrossPointDelay(name: string, inputs: string, outputs: string, value: number, ramp?: number): Promise<unknown> {
+    const params: Record<string, unknown> = { Name: name, Inputs: inputs, Outputs: outputs, Value: value };
+    if (ramp != null) params.Ramp = ramp;
+    return this.send('Mixer.SetCrossPointDelay', params);
+  }
+
+  mixerSetCrossPointMute(name: string, inputs: string, outputs: string, value: boolean): Promise<unknown> {
+    return this.send('Mixer.SetCrossPointMute', { Name: name, Inputs: inputs, Outputs: outputs, Value: value });
+  }
+
+  mixerSetCrossPointSolo(name: string, inputs: string, outputs: string, value: boolean): Promise<unknown> {
+    return this.send('Mixer.SetCrossPointSolo', { Name: name, Inputs: inputs, Outputs: outputs, Value: value });
+  }
+
+  mixerSetInputGain(name: string, inputs: string, value: number, ramp?: number): Promise<unknown> {
+    const params: Record<string, unknown> = { Name: name, Inputs: inputs, Value: value };
+    if (ramp != null) params.Ramp = ramp;
+    return this.send('Mixer.SetInputGain', params);
+  }
+
+  mixerSetInputMute(name: string, inputs: string, value: boolean): Promise<unknown> {
+    return this.send('Mixer.SetInputMute', { Name: name, Inputs: inputs, Value: value });
+  }
+
+  mixerSetInputSolo(name: string, inputs: string, value: boolean): Promise<unknown> {
+    return this.send('Mixer.SetInputSolo', { Name: name, Inputs: inputs, Value: value });
+  }
+
+  mixerSetOutputGain(name: string, outputs: string, value: number, ramp?: number): Promise<unknown> {
+    const params: Record<string, unknown> = { Name: name, Outputs: outputs, Value: value };
+    if (ramp != null) params.Ramp = ramp;
+    return this.send('Mixer.SetOutputGain', params);
+  }
+
+  mixerSetOutputMute(name: string, outputs: string, value: boolean): Promise<unknown> {
+    return this.send('Mixer.SetOutputMute', { Name: name, Outputs: outputs, Value: value });
+  }
+
+  mixerSetCueGain(name: string, cues: string, value: number, ramp?: number): Promise<unknown> {
+    const params: Record<string, unknown> = { Name: name, Cues: cues, Value: value };
+    if (ramp != null) params.Ramp = ramp;
+    return this.send('Mixer.SetCueGain', params);
+  }
+
+  mixerSetCueMute(name: string, cues: string, value: boolean): Promise<unknown> {
+    return this.send('Mixer.SetCueMute', { Name: name, Cues: cues, Value: value });
+  }
+
+  mixerSetInputCueEnable(name: string, cues: string, inputs: string, value: boolean): Promise<unknown> {
+    return this.send('Mixer.SetInputCueEnable', { Name: name, Cues: cues, Inputs: inputs, Value: value });
+  }
+
+  mixerSetInputCueAfl(name: string, cues: string, inputs: string, value: boolean): Promise<unknown> {
+    return this.send('Mixer.SetInputCueAfl', { Name: name, Cues: cues, Inputs: inputs, Value: value });
+  }
+
   private groupState(id: string): ChangeGroupState {
     let g = this.changeGroups.get(id);
     if (!g) {
