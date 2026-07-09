@@ -6,6 +6,21 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-09
+
+### Added
+
+- `qsys mixer {crosspoint,input,output,cue,cue-input}` — mirror the five grouped
+  mixer operations from the CLI. Each dispatches an `op` to the matching
+  `qsys-qrc` `mixerSet*` wrapper, with a local value-type guard (gain/delay require
+  a number; the rest a boolean), a confirmation echo, and `--json`. Selectors are
+  quoted String Syntax (`"1-3"`, `"* !2"`); mixer state is inspected via
+  `qsys get-component <mixer>` (there is no `Mixer.Get*`).
+
+### Changed
+
+- Requires `qsys-qrc` ^0.3.0 (for the `mixerSet*` wrappers).
+
 ## [0.1.2] - 2026-07-08
 
 ### Fixed

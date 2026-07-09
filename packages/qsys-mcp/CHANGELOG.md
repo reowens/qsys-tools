@@ -6,6 +6,22 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-09
+
+### Added
+
+- Mixer control: 5 grouped tools (18 → **23**) — `qsys_mixer_set_crosspoint`,
+  `qsys_mixer_set_input`, `qsys_mixer_set_output`, `qsys_mixer_set_cue`, and
+  `qsys_mixer_set_cue_input`. An `op` enum selects the concrete `Mixer.Set*` method;
+  `value` is `number | boolean` with a per-tool runtime guard (gain/delay require a
+  number; mute/solo/enable/afl a boolean); `Ramp` is forwarded only for gain/delay.
+  Selectors are pass-through QRC String Syntax; all five emit the live-Core warning.
+  Mixer state reads back through `qsys_get_component` (no `Mixer.Get*` on the wire).
+
+### Changed
+
+- Requires `qsys-qrc` ^0.3.0 (for the `mixerSet*` wrappers).
+
 ## [0.3.3] - 2026-07-08
 
 ### Changed

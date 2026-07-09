@@ -6,6 +6,18 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-09
+
+### Added
+
+- Mixer control: 13 `mixerSet*` wrappers over the QRC `Mixer.Set*` methods —
+  `mixerSetCrossPoint{Gain,Delay,Mute,Solo}`, `mixerSetInput{Gain,Mute,Solo}`,
+  `mixerSetOutput{Gain,Mute}`, `mixerSetCue{Gain,Mute}`, and
+  `mixerSetInputCue{Enable,Afl}`. Selectors are pass-through QRC **String Syntax**
+  (`*`, lists, `1-6` ranges, `!` negation); optional `Ramp` on the five gain/delay
+  wrappers only. Method names and params verified against the Q-SYS v10.4 offline
+  help. Live-validated against a real engine (Designer Emulate).
+
 ## [0.2.1] - 2026-07-08
 
 ### Changed
