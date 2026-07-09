@@ -153,7 +153,8 @@ export function buildServer(): McpServer {
     {
       title: 'List components',
       description:
-        'List named components in the running/emulated design, with type and properties (Component.GetComponents). On large designs use filter/type/names_only to trim the response.',
+        'List named components in the running/emulated design, with type and properties (Component.GetComponents). On large designs use filter/type/names_only to trim the response. ' +
+        'Note: QRC only sees components whose Designer "Script Access" is set to External or All (None is the default) — a component missing here, or one that silently ignores writes, most likely needs its Code Name + Script Access set in Designer.',
       inputSchema: {
         filter: z.string().optional().describe('Case-insensitive substring; only components whose name contains it are returned'),
         type: z.string().optional().describe('Case-insensitive substring on component type (e.g. "gain", "mixer")'),

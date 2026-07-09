@@ -14,7 +14,7 @@ It's a pure wire-protocol client: **zero QSC code**, no SDK, no hardware require
 
 ## Highlights
 
-- **18 tools** covering connect, status, discovery, read, write (with ramps), snapshots, the full change-group lifecycle (add/poll/remove/clear/invalidate/destroy), and disconnect.
+- **25 tools** covering connect, status, discovery, read, write (with ramps), snapshots, Mixer control, Loop Player playback, the full change-group lifecycle (add/poll/remove/clear/invalidate/destroy), and disconnect.
 - **No hardware needed** — develop entirely against Designer's Emulate-mode soft-core on `localhost`.
 - **Cross-platform** — `node:net` only; CI proves it on Linux + macOS × Node 22 & 24.
 - **Context-friendly** — list/get tools take `filter` / `names_only` / `type` so large designs don't flood the agent's context.
@@ -104,6 +104,13 @@ qsys_poll_change_group    → { id: "meters" }   // returns only what changed si
 | `qsys_set_component` | `Component.Set` | Set component controls (with optional ramps) |
 | `qsys_load_snapshot` | `Snapshot.Load` | Recall a saved snapshot (with optional ramp) |
 | `qsys_save_snapshot` | `Snapshot.Save` | Capture current settings into a snapshot |
+| `qsys_mixer_set_crosspoint` | `Mixer.SetCrossPoint{Gain,Delay,Mute,Solo}` | Set input×output crosspoints |
+| `qsys_mixer_set_input` | `Mixer.SetInput{Gain,Mute,Solo}` | Set mixer inputs |
+| `qsys_mixer_set_output` | `Mixer.SetOutput{Gain,Mute}` | Set mixer outputs |
+| `qsys_mixer_set_cue` | `Mixer.SetCue{Gain,Mute}` | Set mixer cues |
+| `qsys_mixer_set_cue_input` | `Mixer.SetInputCue{Enable,Afl}` | Route/monitor inputs to cues |
+| `qsys_loop_player_start` | `LoopPlayer.Start` | Play/queue files on a Loop Player's outputs |
+| `qsys_loop_player_stop_cancel` | `LoopPlayer.Stop` / `LoopPlayer.Cancel` | Stop playback / cancel a queued job |
 | `qsys_create_change_group` | `ChangeGroup.AddControl` | Watch Named Controls for changes |
 | `qsys_change_group_add_component` | `ChangeGroup.AddComponentControl` | Watch a component's controls |
 | `qsys_poll_change_group` | `ChangeGroup.Poll` | Get changes since last poll |
@@ -120,9 +127,22 @@ qsys_poll_change_group    → { id: "meters" }   // returns only what changed si
 Q-SYS exposes controls two ways, and the tools mirror that split:
 
 - **Named Controls** (`qsys_get_control` / `qsys_set_control`) reach a control only if it's been *explicitly exposed* — dragged into the **Named Controls** pane in Designer with a unique name. Flat namespace, addressed by that one name.
-- **Component controls** (`qsys_get_component_controls` / `qsys_get_component` / `qsys_set_component`) reach any control on a component whose parent has a **Code Name** with **Script Access** enabled — no per-control naming needed.
+- **Component controls** (`qsys_get_component_controls` / `qsys_get_component` / `qsys_set_component`, plus the Mixer and Loop Player tools) reach any control on a component that has a **Code Name** *and* a QRC-reachable **Script Access** setting — no per-control naming needed.
 
 If `qsys_get_control` can't find a name, it almost always means the control hasn't been added to the Named Controls pane.
+
+### Script Access — the QRC visibility gate ⚠
+
+QRC can only see or move a component whose **Script Access** allows external control. This is a per-component property set in Designer, and its values are ([Q-SYS Help](https://help.qsys.com/DeveloperHelp/#Getting_Started/Script_vs._Plugin_Determination.htm)):
+
+| Script Access | Reachable by these tools (QRC)? |
+|---|---|
+| **None** *(default)* | ❌ Invisible to QRC — and to scripts/plugins too |
+| **Script** | ❌ On-Core scripts/plugins only, **not** QRC |
+| **External** | ✅ QRC only |
+| **All** | ✅ QRC + scripts + plugins |
+
+Because **`None` is the default**, a component is *invisible to these tools until someone sets it to `External` or `All`* in Designer and gives it a Code Name. So if `qsys_list_components` omits a component you can see in the schematic, or a `qsys_set_component` / Mixer / Loop Player write silently no-ops on a real Core, the first thing to check is that component's **Code Name + Script Access**. (Designer's *Script Programmer Mode* shows the setting on each component without disconnecting.) Note the development mock/emulator behind this repo's tests does **not** model Script Access — every component is reachable there — so a design that drives fine in tests can still be gated on a real target. Always confirm Script Access on the actual Core before blaming the tools.
 
 ## Requirements
 

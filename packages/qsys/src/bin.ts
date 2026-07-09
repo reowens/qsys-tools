@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * qsys — control a running Q-SYS Core (or qsys-emulator) over QRC from the
+ * qsys — control a running Q-SYS Core (or Q-SYS Designer's Emulate mode) over QRC from the
  * shell. The human/scriptable sibling of qsys-mcp, over the same QrcClient.
  *
  *   qsys status --host 192.168.1.10
