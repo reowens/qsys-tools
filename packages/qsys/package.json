@@ -1,6 +1,6 @@
 {
   "name": "qsys-cli",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Human/scriptable CLI to control a Q-SYS Core over QRC — status, component inventory, get/set controls, watch, snapshots.",
   "type": "module",
   "main": "dist/index.js",

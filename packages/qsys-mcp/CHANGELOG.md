@@ -6,6 +6,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-10
+
 ### Changed
 
 - **Live-Core writes are now fail-closed** (breaking for live-Core workflows):
@@ -20,6 +22,10 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   clients can gate destructive calls without parsing descriptions.
 - The `test/live-write.ts` smoke script refuses to mutate a non-emulator target
   unless `QSYS_LIVE_WRITE_OK=1` is set.
+- Via qsys-qrc (now ^0.5.0): a write whose response is lost to a connection
+  drop fails with `QrcIndeterminateError` instead of being silently
+  retransmitted (a blind retry could double a trigger or playback start on a
+  live system).
 
 ### Fixed
 
@@ -35,12 +41,6 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   newer healthy connection (generation-tokened).
 - MCP transport closure (stdio EOF) now closes the QRC socket, so an orphaned
   server process no longer holds an authenticated Core connection open.
-
-### Changed
-
-- Via qsys-qrc: a write whose response is lost to a connection drop now fails
-  with `QrcIndeterminateError` instead of being silently retransmitted (a blind
-  retry could double a trigger or playback start on a live system).
 
 ## [0.5.0] - 2026-07-09
 

@@ -6,6 +6,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-10
+
 ### Fixed
 
 - **`loop-player start` wire shape**: `--loop`, `--seek`, `--log`, and
