@@ -236,11 +236,19 @@ export class MockCore {
       case 'ChangeGroup.Remove': {
         const g = this.changeGroups.get(msg.params.Id);
         if (!g) return error(ERR_INVALID_PARAMS, `Unknown change group: ${msg.params.Id}`);
+        // ChangeGroup.Remove "returns a list of unknown controls after processing"
+        // (QRC_Commands.htm) — the requested names the Core doesn't recognize as Named
+        // Controls. Known names are dropped from the group; unknown ones are reported.
+        const unknown: string[] = [];
         for (const c of msg.params.Controls ?? []) {
-          g.controls.delete(c);
-          g.lastSent.delete(c);
+          if (this.namedDef.has(c)) {
+            g.controls.delete(c);
+            g.lastSent.delete(c);
+          } else {
+            unknown.push(c);
+          }
         }
-        return reply(null);
+        return reply(unknown);
       }
       case 'ChangeGroup.Clear': {
         const g = this.changeGroups.get(msg.params.Id);
