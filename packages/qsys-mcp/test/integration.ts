@@ -77,10 +77,16 @@ async function main(): Promise<void> {
   await client.changeGroupPoll('cg1'); // baseline both
   await client.setControl('MainGain', 11);
   await client.setControl('MainMute', 1);
-  await client.changeGroupRemove('cg1', ['MainGain']);
+  const removed = await client.changeGroupRemove('cg1', ['MainGain']);
+  assert.deepEqual(removed, [], 'Remove of a known control returns an empty unknown-list');
   const afterRemove = await client.changeGroupPoll('cg1');
   assert.ok(afterRemove.Changes.find((c) => c.Name === 'MainMute'), 'MainMute still watched after remove');
   assert.ok(!afterRemove.Changes.find((c) => c.Name === 'MainGain'), 'MainGain no longer watched after remove');
+
+  // Remove reports names the Core doesn't recognize as its unknown-controls list
+  // (ChangeGroup.Remove "returns a list of unknown controls after processing").
+  const unknown = await client.changeGroupRemove('cg1', ['NoSuchControl', 'MainMute']);
+  assert.deepEqual(unknown, ['NoSuchControl'], 'Remove returns only the unrecognized names');
 
   // Clear empties the group but keeps it pollable (ChangeGroup.Clear)
   await client.changeGroupClear('cg1');
