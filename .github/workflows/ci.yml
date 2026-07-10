@@ -53,3 +53,18 @@ jobs:
       # against the in-repo qsys-mock-core, so they exercise the protocol on every
       # push with no hardware and no private dependency.
       - run: pnpm test
+
+      # macOS-only installer smoke test: shell-syntax across the 9 installer scripts,
+      # WINEDLLOVERRIDES launch-path parity (dev / generated .app / installed GUI), the
+      # MSI path-containment fixtures, and the Wine process-cleanup harness (which stubs
+      # wineserver, so no real Wine is needed). QSYS_SKIP_XCODE=1 skips the xcodebuild
+      # step on purpose: the Installer target copies Resources/{bin,cache}, which are
+      # gitignored and only materialized by bundle-deps.sh (it downloads the Wine + .NET
+      # bundle) — a packaging concern, not a per-PR gate. Without them `xcodegen generate`
+      # fails spec validation ("missing source directory"), so a full build can't run in
+      # a clean checkout. Runs only on the macOS matrix leg.
+      - name: Installer smoke test (qsys-mac-installer)
+        if: matrix.os == 'macos-latest'
+        env:
+          QSYS_SKIP_XCODE: "1"
+        run: packages/qsys-mac-installer/scripts/test.sh
