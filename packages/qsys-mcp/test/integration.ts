@@ -123,25 +123,47 @@ async function main(): Promise<void> {
   );
 
   // LoopPlayer.{Start,Stop,Cancel} — write-only wrappers; assert the exact method + params.
-  // Outputs is an integer table (NOT String Syntax); unset per-file/top-level fields are omitted.
+  // Outputs is an integer table (NOT String Syntax); unset optional fields are omitted.
+  // Loop/Seek/Log/RefID are TOP-LEVEL params — a Files entry carries only Name/Output
+  // (QRC_Commands.htm, LoopPlayer.Start).
   await client.loopPlayerStart({ name: 'Player1', files: [{ name: 'Audio/mainloop.wav', output: 1 }] });
   assert.deepEqual(
     mock.lastLoopPlayerCall(),
     { method: 'LoopPlayer.Start', params: { Name: 'Player1', Files: [{ Name: 'Audio/mainloop.wav', Output: 1 }] } },
     'Start maps files[]→Name/Output and omits StartTime + unset options',
   );
+  // Golden wire: the official LoopPlayer.Start example from QRC_Commands.htm, verbatim.
   await client.loopPlayerStart({
-    name: 'Player1',
-    startTime: -2, // queue after current
-    files: [{ name: 'Audio/next.wav', output: 2, loop: true, seek: 3, log: true, refId: 'job-7' }],
+    name: 'test',
+    startTime: 62600,
+    files: [{ name: 'Audio/mainloop.wav', output: 1 }],
+    loop: false,
+    log: true,
   });
   assert.deepEqual(
     mock.lastLoopPlayerCall(),
     {
       method: 'LoopPlayer.Start',
-      params: { Name: 'Player1', StartTime: -2, Files: [{ Name: 'Audio/next.wav', Output: 2, Loop: true, Seek: 3, Log: true, RefID: 'job-7' }] },
+      params: { Files: [{ Name: 'Audio/mainloop.wav', Output: 1 }], Name: 'test', StartTime: 62600, Loop: false, Log: true },
     },
-    'Start passes StartTime + all per-file options through with QRC casing',
+    'Start matches the official QRC example wire shape (options top-level, explicit false passes through)',
+  );
+  await client.loopPlayerStart({
+    name: 'Player1',
+    startTime: -2, // queue after current
+    files: [{ name: 'Audio/next.wav', output: 2 }],
+    loop: true,
+    seek: 3,
+    log: true,
+    refId: 'job-7',
+  });
+  assert.deepEqual(
+    mock.lastLoopPlayerCall(),
+    {
+      method: 'LoopPlayer.Start',
+      params: { Name: 'Player1', StartTime: -2, Files: [{ Name: 'Audio/next.wav', Output: 2 }], Loop: true, Seek: 3, Log: true, RefID: 'job-7' },
+    },
+    'Start emits Loop/Seek/Log/RefID at the top level with QRC casing',
   );
   await client.loopPlayerStop('Player1', [1, 2]);
   assert.deepEqual(

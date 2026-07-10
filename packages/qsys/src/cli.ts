@@ -1,4 +1,4 @@
-import { QrcClient, type QrcControl, type LoopPlayerFile } from 'qsys-qrc';
+import { QrcClient, type QrcControl, type LoopPlayerStartParams } from 'qsys-qrc';
 import {
   CONTROL_HEADER,
   coerceValue,
@@ -413,14 +413,15 @@ async function loopPlayerCommand(
       const startTime = numFlag(flags['start-time'], 'start-time');
       const seek = numFlag(flags.seek, 'seek');
       const refId = flags['ref-id'] as string | undefined;
-      const fileEntry: LoopPlayerFile = { name: file, output };
-      if (flags.loop === true) fileEntry.loop = true;
-      if (seek != null) fileEntry.seek = seek;
-      if (flags.log === true) fileEntry.log = true;
-      if (refId != null) fileEntry.refId = refId;
-      await client.loopPlayerStart({ name: comp, files: [fileEntry], startTime });
+      const params: LoopPlayerStartParams = { name: comp, files: [{ name: file, output }] };
+      if (startTime != null) params.startTime = startTime;
+      if (flags.loop === true) params.loop = true;
+      if (seek != null) params.seek = seek;
+      if (flags.log === true) params.log = true;
+      if (refId != null) params.refId = refId;
+      await client.loopPlayerStart(params);
       if (json) {
-        io.out(JSON.stringify({ ok: true, target: 'start', name: comp, files: [fileEntry], ...(startTime != null ? { startTime } : {}) }, null, 2));
+        io.out(JSON.stringify({ ok: true, target: 'start', ...params }, null, 2));
         return 0;
       }
       const opts: string[] = [];

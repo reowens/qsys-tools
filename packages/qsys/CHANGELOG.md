@@ -6,6 +6,18 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- **`loop-player start` wire shape**: `--loop`, `--seek`, `--log`, and
+  `--ref-id` now emit as top-level `LoopPlayer.Start` params, matching the
+  official QRC spec (previously they were nested inside the `Files[]` entry,
+  where a real Core ignores them). The CLI flag surface is unchanged.
+
+### Changed
+
+- Via qsys-qrc: a write whose response is lost to a connection drop now fails
+  with `QrcIndeterminateError` instead of being silently retransmitted.
+
 ## [0.3.0] - 2026-07-09
 
 ### Added

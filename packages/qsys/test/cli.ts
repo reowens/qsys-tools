@@ -216,9 +216,9 @@ async function main(): Promise<void> {
       '--loop', '--seek', '3', '--start-time', '-2', '--log', '--ref-id', 'job-7']);
     assert.deepEqual(emu.lastLoopPlayerCall(), {
       method: 'LoopPlayer.Start',
-      params: { Name: 'Player1', StartTime: -2, Files: [{ Name: 'Audio/next.wav', Output: 2, Loop: true, Seek: 3, Log: true, RefID: 'job-7' }] },
+      params: { Name: 'Player1', StartTime: -2, Files: [{ Name: 'Audio/next.wav', Output: 2 }], Loop: true, Seek: 3, Log: true, RefID: 'job-7' },
     });
-    ok('loop-player start passes flags + negative start-time through');
+    ok('loop-player start passes flags through as top-level QRC params');
   }
   {
     await run(['loop-player', 'stop', 'Player1', '1,2']);

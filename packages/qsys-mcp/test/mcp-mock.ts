@@ -151,17 +151,30 @@ async function main(): Promise<void> {
   const afterDestroy: any = await client.callTool({ name: 'qsys_poll_change_group', arguments: { id: 'g' } });
   assert.ok(afterDestroy?.isError, 'polling a destroyed group errors');
 
-  // Live-Core write warning: reconnect to a non-emulator mock and confirm writes warn.
+  // Live-Core write gate: reconnect to a non-emulator mock. Without
+  // allow_live_writes every write must be REFUSED before reaching the wire;
+  // with it, writes go through and carry the LIVE warning.
   const liveMock = await startMockQrc(0, { isEmulator: false });
-  await call('qsys_connect', { host: '127.0.0.1', port: liveMock.port });
+  const liveConn = json(await call('qsys_connect', { host: '127.0.0.1', port: liveMock.port }));
+  assert.ok(/LIVE/.test(liveConn.note ?? ''), 'connecting to a live Core without allow_live_writes flags writes as disabled');
+  const refused: any = await client.callTool({ name: 'qsys_set_control', arguments: { name: 'MainGain', value: -5 } });
+  assert.ok(refused?.isError && /Write refused/.test(text(refused)), 'set_control on a live Core is refused without allow_live_writes');
+  const refusedSave: any = await client.callTool({ name: 'qsys_save_snapshot', arguments: { bank: 'B', number: 1 } });
+  assert.ok(refusedSave?.isError && /Write refused/.test(text(refusedSave)), 'save_snapshot is gated too (it overwrites stored state)');
+  const refusedMix: any = await client.callTool({ name: 'qsys_mixer_set_input', arguments: { name: 'Mixer1', inputs: '1', op: 'gain', value: -6 } });
+  assert.ok(refusedMix?.isError && /Write refused/.test(text(refusedMix)), 'mixer write on a live Core is refused without allow_live_writes');
+
+  await call('qsys_connect', { host: '127.0.0.1', port: liveMock.port, allow_live_writes: true });
   const setWarned = json(await call('qsys_set_control', { name: 'MainGain', value: -5 }));
-  assert.ok(/LIVE/.test(setWarned.warning ?? ''), 'set_control on a live Core returns a warning');
+  assert.ok(/LIVE/.test(setWarned.warning ?? ''), 'set_control on a live Core (allowed) returns a warning');
   const loadWarned = json(await call('qsys_load_snapshot', { bank: 'B', number: 1 }));
-  assert.ok(/LIVE/.test(loadWarned.warning ?? ''), 'load_snapshot on a live Core returns a warning');
+  assert.ok(/LIVE/.test(loadWarned.warning ?? ''), 'load_snapshot on a live Core (allowed) returns a warning');
+  const saveWarned = json(await call('qsys_save_snapshot', { bank: 'B', number: 1 }));
+  assert.ok(/LIVE/.test(saveWarned.warning ?? ''), 'save_snapshot on a live Core (allowed) returns a warning');
   const mixWarned = json(await call('qsys_mixer_set_input', { name: 'Mixer1', inputs: '1', op: 'gain', value: -6 }));
-  assert.ok(/LIVE/.test(mixWarned.warning ?? ''), 'mixer write on a live Core returns a warning');
+  assert.ok(/LIVE/.test(mixWarned.warning ?? ''), 'mixer write on a live Core (allowed) returns a warning');
   const lpWarned = json(await call('qsys_loop_player_start', { name: 'Player1', files: [{ name: 'x.wav', output: 1 }] }));
-  assert.ok(/LIVE/.test(lpWarned.warning ?? ''), 'loop player start on a live Core returns a warning');
+  assert.ok(/LIVE/.test(lpWarned.warning ?? ''), 'loop player start on a live Core (allowed) returns a warning');
 
   // Disconnect (from the live mock — clean, no reconnect storm)
   const disc = json(await call('qsys_disconnect'));

@@ -5,9 +5,6 @@ import { QrcClient, type EngineStatus, type QrcComponent, type QrcControl } from
 
 const { version: PKG_VERSION } = createRequire(import.meta.url)('../package.json') as { version: string };
 
-let client: QrcClient | null = null;
-let lastEngineStatus: EngineStatus | null = null;
-
 function ok(data: unknown) {
   const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
   return { content: [{ type: 'text' as const, text }] };
@@ -15,24 +12,6 @@ function ok(data: unknown) {
 
 function fail(message: string) {
   return { content: [{ type: 'text' as const, text: `Error: ${message}` }], isError: true };
-}
-
-function requireClient(): QrcClient {
-  // Don't gate on isConnected(): a reconnect-enabled client may be mid-drop, and
-  // its send() transparently waits for the socket to come back. Only a missing
-  // client (never connected, or explicitly disconnected) is a hard error.
-  if (!client) {
-    throw new Error('Not connected to Q-SYS. Call qsys_connect first.');
-  }
-  return client;
-}
-
-/** Warn when a write targets a live Core rather than an emulator. */
-function liveCoreWarning(): string | null {
-  if (lastEngineStatus && lastEngineStatus.IsEmulator === false) {
-    return `⚠ Writing to a LIVE Q-SYS Core (design "${lastEngineStatus.DesignName}"), not an emulator — this changes real audio.`;
-  }
-  return null;
 }
 
 const controlValue = z.union([z.number(), z.string(), z.boolean()]);
@@ -89,10 +68,75 @@ function shapeControls(
 export function buildServer(): McpServer {
   const server = new McpServer({ name: 'qsys-mcp', version: PKG_VERSION });
 
+  // Connection state is scoped to this server instance (NOT module-global):
+  // multiple buildServer() instances in one process must not share a target,
+  // and stale callbacks from an abandoned connect must not clobber a newer one.
+  let client: QrcClient | null = null;
+  let lastEngineStatus: EngineStatus | null = null;
+  // Live-write capability, granted once per connection via qsys_connect's
+  // allow_live_writes flag. Never inferred.
+  let allowLiveWrites = false;
+  // Bumped on every qsys_connect call; an attempt whose generation is stale by
+  // the time it finishes was superseded and must close its candidate instead of
+  // publishing it.
+  let connectGeneration = 0;
+
+  // Tie QRC cleanup to the MCP transport: when the client editor/agent goes away
+  // (stdio EOF, transport close), drop the authenticated Core socket instead of
+  // holding it open — and its keepalive — from an orphaned process.
+  server.server.onclose = () => {
+    connectGeneration++;
+    client?.close();
+    client = null;
+    lastEngineStatus = null;
+    allowLiveWrites = false;
+  };
+
+  function requireClient(): QrcClient {
+    // Don't gate on isConnected(): a reconnect-enabled client may be mid-drop, and
+    // its send() transparently waits for the socket to come back. Only a missing
+    // client (never connected, or explicitly disconnected) is a hard error.
+    if (!client) {
+      throw new Error('Not connected to Q-SYS. Call qsys_connect first.');
+    }
+    return client;
+  }
+
+  /**
+   * Fail-closed write gate, called BEFORE every mutation reaches the wire.
+   * Writes are permitted only when the target is a known emulator, or the
+   * caller explicitly connected with allow_live_writes. Unknown/missing engine
+   * status counts as live — never guess with real audio.
+   */
+  function assertWritePermitted(): void {
+    if (allowLiveWrites) return;
+    if (!lastEngineStatus) {
+      throw new Error(
+        'Write refused: engine status is unknown, so the target must be assumed to be a LIVE Q-SYS Core. ' +
+          'Reconnect with qsys_connect { allow_live_writes: true } to write anyway.',
+      );
+    }
+    if (lastEngineStatus.IsEmulator !== true) {
+      throw new Error(
+        `Write refused: connected to a LIVE Q-SYS Core (design "${lastEngineStatus.DesignName}") — this would change real audio. ` +
+          'Reconnect with qsys_connect { allow_live_writes: true } to enable live writes for this session.',
+      );
+    }
+  }
+
+  /** Warn when a permitted write just changed a live Core rather than an emulator. */
+  function liveCoreWarning(): string | null {
+    if (lastEngineStatus && lastEngineStatus.IsEmulator === false) {
+      return `⚠ Writing to a LIVE Q-SYS Core (design "${lastEngineStatus.DesignName}"), not an emulator — this changes real audio.`;
+    }
+    return null;
+  }
+
   server.registerTool(
     'qsys_connect',
     {
       title: 'Connect to Q-SYS',
+      annotations: { readOnlyHint: false, destructiveHint: false },
       description:
         'Connect to a Q-SYS Core or to Q-SYS Designer running in Emulate mode (press F6 in Designer), over the QRC protocol (TCP). For a local emulator use host "127.0.0.1" and port 1710. Must be called before any other tool.',
       inputSchema: {
@@ -104,29 +148,56 @@ export function buildServer(): McpServer {
           .boolean()
           .default(true)
           .describe('Auto-reconnect on a dropped socket (Core restart, network blip), replaying change-group registrations so polling resumes. Default true.'),
+        allow_live_writes: z
+          .boolean()
+          .default(false)
+          .describe(
+            'Permit write tools against a LIVE (non-emulator) Core. Default false: writes are refused unless the target reports IsEmulator=true. Set true only when the user has explicitly approved changing a real system.',
+          ),
       },
     },
-    async ({ host, port, user, password, reconnect }) => {
+    async ({ host, port, user, password, reconnect, allow_live_writes }) => {
+      // Fail-safe ordering: drop the old connection immediately (a failed attempt
+      // must not leave writes silently going to the previous target), publish the
+      // candidate only after logon + status fully succeed, and close the candidate
+      // on every failure path so no half-open socket leaks.
+      const gen = ++connectGeneration;
+      if (client) {
+        client.close();
+        client = null;
+        lastEngineStatus = null;
+      }
+      allowLiveWrites = false;
+      const c = new QrcClient({ host, port, reconnect });
+      c.on('engineStatus', (s: EngineStatus) => {
+        // Ignore pushes from a superseded/unpublished connection.
+        if (client === c) lastEngineStatus = s;
+      });
+      c.on('error', () => {
+        /* surfaced per-request; avoid crashing the server on transient socket errors */
+      });
+      c.on('reconnecting', (attempt: number) => console.error(`[qrc] connection dropped — reconnecting (attempt ${attempt})…`));
+      c.on('reconnected', () => console.error('[qrc] reconnected; change-group registrations replayed'));
+      c.on('reconnectFailed', () => console.error('[qrc] reconnect gave up; will retry on the next request'));
       try {
-        if (client) client.close();
-        const c = new QrcClient({ host, port, reconnect });
-        c.on('engineStatus', (s: EngineStatus) => {
-          lastEngineStatus = s;
-        });
-        c.on('error', () => {
-          /* surfaced per-request; avoid crashing the server on transient socket errors */
-        });
-        c.on('reconnecting', (attempt: number) => console.error(`[qrc] connection dropped — reconnecting (attempt ${attempt})…`));
-        c.on('reconnected', () => console.error('[qrc] reconnected; change-group registrations replayed'));
-        c.on('reconnectFailed', () => console.error('[qrc] reconnect gave up; will retry on the next request'));
         await c.connect();
         if (user && password) await c.logon(user, password);
-        client = c;
         const status = await c.statusGet();
+        if (gen !== connectGeneration) {
+          // A newer qsys_connect ran while this one was in flight — yield to it.
+          c.close();
+          return fail('This connect attempt was superseded by a newer qsys_connect call.');
+        }
+        client = c;
         lastEngineStatus = status;
-        return ok({ connected: true, host, port, status });
+        allowLiveWrites = allow_live_writes;
+        const liveNote =
+          status.IsEmulator === false && !allow_live_writes
+            ? 'Target is a LIVE Core: write tools are DISABLED for this connection. Reconnect with allow_live_writes: true (with the user\'s explicit approval) to enable them.'
+            : undefined;
+        return ok({ connected: true, host, port, ...(liveNote ? { note: liveNote } : {}), status });
       } catch (e) {
-        client = null;
+        c.close();
         return fail((e as Error).message);
       }
     },
@@ -136,6 +207,7 @@ export function buildServer(): McpServer {
     'qsys_status',
     {
       title: 'Q-SYS engine status',
+      annotations: { readOnlyHint: true },
       description: 'Get the Q-SYS engine status: platform, design name, run state, emulator flag.',
       inputSchema: {},
     },
@@ -152,6 +224,7 @@ export function buildServer(): McpServer {
     'qsys_list_components',
     {
       title: 'List components',
+      annotations: { readOnlyHint: true },
       description:
         'List named components in the running/emulated design, with type and properties (Component.GetComponents). On large designs use filter/type/names_only to trim the response. ' +
         'Note: QRC only sees components whose Designer "Script Access" is set to External or All (None is the default) — a component missing here, or one that silently ignores writes, most likely needs its Code Name + Script Access set in Designer.',
@@ -174,6 +247,7 @@ export function buildServer(): McpServer {
     'qsys_get_component_controls',
     {
       title: 'Get component controls',
+      annotations: { readOnlyHint: true },
       description:
         "List a named component's controls and current values (Component.GetControls). Use filter/names_only to trim large components.",
       inputSchema: {
@@ -195,6 +269,7 @@ export function buildServer(): McpServer {
     'qsys_get_control',
     {
       title: 'Get control values',
+      annotations: { readOnlyHint: true },
       description: 'Get the current values of one or more Named Controls (Control.Get).',
       inputSchema: { names: z.array(z.string()).min(1).describe('Named Control names') },
     },
@@ -211,6 +286,7 @@ export function buildServer(): McpServer {
     'qsys_get_component',
     {
       title: 'Get specific component control values',
+      annotations: { readOnlyHint: true },
       description: 'Get specific control values within a named component (Component.Get).',
       inputSchema: {
         name: z.string().describe('Component name'),
@@ -230,6 +306,7 @@ export function buildServer(): McpServer {
     'qsys_set_control',
     {
       title: 'Set a control value',
+      annotations: { readOnlyHint: false, destructiveHint: true },
       description:
         'Set a Named Control value, optionally ramped over a number of seconds (Control.Set). This MUTATES the running/emulated system.',
       inputSchema: {
@@ -240,6 +317,7 @@ export function buildServer(): McpServer {
     },
     async ({ name, value, ramp }) => {
       try {
+        assertWritePermitted();
         const result = await requireClient().setControl(name, value, ramp);
         const warning = liveCoreWarning();
         return ok(warning ? { warning, result } : result);
@@ -253,6 +331,7 @@ export function buildServer(): McpServer {
     'qsys_set_component',
     {
       title: 'Set component control values',
+      annotations: { readOnlyHint: false, destructiveHint: true },
       description:
         'Set one or more control values within a named component, each optionally ramped (Component.Set). This MUTATES the running/emulated system.',
       inputSchema: {
@@ -270,6 +349,7 @@ export function buildServer(): McpServer {
     },
     async ({ name, controls }) => {
       try {
+        assertWritePermitted();
         const mapped = controls.map((c) => ({
           Name: c.name,
           Value: c.value,
@@ -288,6 +368,7 @@ export function buildServer(): McpServer {
     'qsys_load_snapshot',
     {
       title: 'Recall a snapshot',
+      annotations: { readOnlyHint: false, destructiveHint: true },
       description:
         'Recall control settings from a saved snapshot bank/number, optionally ramped over seconds (Snapshot.Load). This MUTATES the running/emulated system.',
       inputSchema: {
@@ -298,6 +379,7 @@ export function buildServer(): McpServer {
     },
     async ({ bank, number, ramp }) => {
       try {
+        assertWritePermitted();
         const result = await requireClient().snapshotLoad(bank, number, ramp);
         const warning = liveCoreWarning();
         return ok(warning ? { warning, result } : result);
@@ -311,6 +393,7 @@ export function buildServer(): McpServer {
     'qsys_save_snapshot',
     {
       title: 'Save a snapshot',
+      annotations: { readOnlyHint: false, destructiveHint: true },
       description:
         'Capture the current control settings into a snapshot bank/number (Snapshot.Save). This OVERWRITES the stored snapshot.',
       inputSchema: {
@@ -320,7 +403,10 @@ export function buildServer(): McpServer {
     },
     async ({ bank, number }) => {
       try {
-        return ok(await requireClient().snapshotSave(bank, number));
+        assertWritePermitted();
+        const result = await requireClient().snapshotSave(bank, number);
+        const warning = liveCoreWarning();
+        return ok(warning ? { warning, result } : result);
       } catch (e) {
         return fail((e as Error).message);
       }
@@ -333,6 +419,7 @@ export function buildServer(): McpServer {
     'qsys_mixer_set_crosspoint',
     {
       title: 'Set mixer crosspoint(s)',
+      annotations: { readOnlyHint: false, destructiveHint: true },
       description:
         'Set gain/delay (number, ramped) or mute/solo (boolean) on the crosspoints of an input×output selection ' +
         '(Mixer.SetCrossPoint{Gain,Delay,Mute,Solo}). This MUTATES the running/emulated system. ' +
@@ -349,6 +436,7 @@ export function buildServer(): McpServer {
     async ({ name, inputs, outputs, op, value, ramp }) => {
       try {
         guardMixerValue(op, value);
+        assertWritePermitted();
         const c = requireClient();
         let result: unknown;
         switch (op) {
@@ -369,6 +457,7 @@ export function buildServer(): McpServer {
     'qsys_mixer_set_input',
     {
       title: 'Set mixer input(s)',
+      annotations: { readOnlyHint: false, destructiveHint: true },
       description:
         'Set gain (number, ramped) or mute/solo (boolean) on selected mixer inputs ' +
         '(Mixer.SetInput{Gain,Mute,Solo}). This MUTATES the running/emulated system. ' +
@@ -384,6 +473,7 @@ export function buildServer(): McpServer {
     async ({ name, inputs, op, value, ramp }) => {
       try {
         guardMixerValue(op, value);
+        assertWritePermitted();
         const c = requireClient();
         let result: unknown;
         switch (op) {
@@ -403,6 +493,7 @@ export function buildServer(): McpServer {
     'qsys_mixer_set_output',
     {
       title: 'Set mixer output(s)',
+      annotations: { readOnlyHint: false, destructiveHint: true },
       description:
         'Set gain (number, ramped) or mute (boolean) on selected mixer outputs ' +
         '(Mixer.SetOutput{Gain,Mute}). This MUTATES the running/emulated system. ' +
@@ -418,6 +509,7 @@ export function buildServer(): McpServer {
     async ({ name, outputs, op, value, ramp }) => {
       try {
         guardMixerValue(op, value);
+        assertWritePermitted();
         const c = requireClient();
         let result: unknown;
         switch (op) {
@@ -436,6 +528,7 @@ export function buildServer(): McpServer {
     'qsys_mixer_set_cue',
     {
       title: 'Set mixer cue(s)',
+      annotations: { readOnlyHint: false, destructiveHint: true },
       description:
         'Set gain (number, ramped) or mute (boolean) on selected mixer cues ' +
         '(Mixer.SetCue{Gain,Mute}). This MUTATES the running/emulated system. ' +
@@ -451,6 +544,7 @@ export function buildServer(): McpServer {
     async ({ name, cues, op, value, ramp }) => {
       try {
         guardMixerValue(op, value);
+        assertWritePermitted();
         const c = requireClient();
         let result: unknown;
         switch (op) {
@@ -469,6 +563,7 @@ export function buildServer(): McpServer {
     'qsys_mixer_set_cue_input',
     {
       title: 'Route/monitor input(s) to cue(s)',
+      annotations: { readOnlyHint: false, destructiveHint: true },
       description:
         'Enable an input on a cue, or set its AFL (after-fade listen) flag (boolean) ' +
         '(Mixer.SetInputCue{Enable,Afl}). This MUTATES the running/emulated system. ' +
@@ -484,6 +579,7 @@ export function buildServer(): McpServer {
     async ({ name, cues, inputs, op, value }) => {
       try {
         guardMixerValue(op, value);
+        assertWritePermitted();
         const c = requireClient();
         let result: unknown;
         switch (op) {
@@ -505,6 +601,7 @@ export function buildServer(): McpServer {
     'qsys_loop_player_start',
     {
       title: 'Start Loop Player playback',
+      annotations: { readOnlyHint: false, destructiveHint: true },
       description:
         'Schedule one or more audio files to play on a Loop Player component (LoopPlayer.Start). ' +
         'This MUTATES the running/emulated system. There is no QRC method to browse Core files — ' +
@@ -516,26 +613,27 @@ export function buildServer(): McpServer {
             z.object({
               name: z.string().describe('Path + filename of the file on the Core (e.g. "Audio/mainloop.wav")'),
               output: z.number().int().describe('Output track number to play on'),
-              loop: z.boolean().optional().describe('Loop the file continuously (default false)'),
-              seek: z.number().optional().describe('Offset into the file to start at, in seconds (default 0)'),
-              log: z.boolean().optional().describe('Log start + errors to the Core event log (default false)'),
-              refId: z
-                .string()
-                .optional()
-                .describe('If set, the Core logs an async failure notification for this job (the notification is not surfaced by these tools yet)'),
             }),
           )
           .min(1)
-          .describe('One file→output assignment per entry'),
+          .describe('One file→output assignment per entry (a Files entry carries only name + output; the options below apply to the whole job)'),
         startTime: z
           .number()
           .optional()
           .describe('-1 = now, -2 = queue after current, ≥0 = absolute time-of-day (s). Omitted → Core default (0). With Time source "None", 0 plays now and >0 has no effect.'),
+        loop: z.boolean().optional().describe('Loop playback continuously (default false)'),
+        seek: z.number().optional().describe('Offset into the file to start playback, in seconds (default 0)'),
+        log: z.boolean().optional().describe('Log start + errors to the Core event log (default false)'),
+        refId: z
+          .string()
+          .optional()
+          .describe('If set, the Core logs an async failure notification for this job (the notification is not surfaced by these tools yet)'),
       },
     },
-    async ({ name, files, startTime }) => {
+    async ({ name, files, startTime, loop, seek, log, refId }) => {
       try {
-        const result = await requireClient().loopPlayerStart({ name, files, startTime });
+        assertWritePermitted();
+        const result = await requireClient().loopPlayerStart({ name, files, startTime, loop, seek, log, refId });
         const warning = liveCoreWarning();
         return ok(warning ? { warning, result } : result);
       } catch (e) {
@@ -548,6 +646,7 @@ export function buildServer(): McpServer {
     'qsys_loop_player_stop_cancel',
     {
       title: 'Stop or cancel Loop Player playback',
+      annotations: { readOnlyHint: false, destructiveHint: true },
       description:
         'Stop current playback on outputs (op "stop"), or cancel a pending/queued future-start job ' +
         'without disrupting current playback (op "cancel") — LoopPlayer.Stop / LoopPlayer.Cancel. ' +
@@ -561,6 +660,7 @@ export function buildServer(): McpServer {
     },
     async ({ name, op, outputs, log }) => {
       try {
+        assertWritePermitted();
         const c = requireClient();
         const result = op === 'stop'
           ? await c.loopPlayerStop(name, outputs, log)
@@ -577,6 +677,7 @@ export function buildServer(): McpServer {
     'qsys_create_change_group',
     {
       title: 'Create or extend a change group',
+      annotations: { readOnlyHint: false, destructiveHint: false },
       description:
         'Create a change group (or add Named Controls to an existing one) so you can poll for changes (ChangeGroup.AddControl).',
       inputSchema: {
@@ -597,6 +698,7 @@ export function buildServer(): McpServer {
     'qsys_poll_change_group',
     {
       title: 'Poll a change group',
+      annotations: { readOnlyHint: true },
       description: 'Poll a change group; returns the controls that changed since the last poll (ChangeGroup.Poll).',
       inputSchema: { id: z.string().describe('Change group id') },
     },
@@ -613,6 +715,7 @@ export function buildServer(): McpServer {
     'qsys_change_group_add_component',
     {
       title: 'Add component controls to a change group',
+      annotations: { readOnlyHint: false, destructiveHint: false },
       description:
         "Add a named component's controls to a change group so you can poll them for changes (ChangeGroup.AddComponentControl).",
       inputSchema: {
@@ -634,6 +737,7 @@ export function buildServer(): McpServer {
     'qsys_destroy_change_group',
     {
       title: 'Destroy a change group',
+      annotations: { readOnlyHint: false, destructiveHint: false },
       description: 'Destroy a change group, freeing its server-side state (ChangeGroup.Destroy).',
       inputSchema: { id: z.string().describe('Change group id') },
     },
@@ -650,6 +754,7 @@ export function buildServer(): McpServer {
     'qsys_change_group_remove',
     {
       title: 'Remove controls from a change group',
+      annotations: { readOnlyHint: false, destructiveHint: false },
       description:
         'Remove Named Controls from a change group, leaving the group in place (ChangeGroup.Remove). Returns any unknown control names.',
       inputSchema: {
@@ -670,6 +775,7 @@ export function buildServer(): McpServer {
     'qsys_change_group_clear',
     {
       title: 'Clear a change group',
+      annotations: { readOnlyHint: false, destructiveHint: false },
       description: 'Remove all controls from a change group without destroying it (ChangeGroup.Clear).',
       inputSchema: { id: z.string().describe('Change group id') },
     },
@@ -686,6 +792,7 @@ export function buildServer(): McpServer {
     'qsys_change_group_invalidate',
     {
       title: 'Invalidate a change group',
+      annotations: { readOnlyHint: false, destructiveHint: false },
       description:
         'Invalidate a change group so the next poll resends every watched control, not just the changes (ChangeGroup.Invalidate). Handy after a reconnect to force a full snapshot.',
       inputSchema: { id: z.string().describe('Change group id') },
@@ -705,6 +812,7 @@ export function buildServer(): McpServer {
     'qsys_disconnect',
     {
       title: 'Disconnect from Q-SYS',
+      annotations: { readOnlyHint: false, destructiveHint: false },
       description: 'Close the QRC connection to the Core/emulator. A later qsys_connect is required before other tools.',
       inputSchema: {},
     },
@@ -714,6 +822,7 @@ export function buildServer(): McpServer {
         client = null;
         lastEngineStatus = null;
       }
+      allowLiveWrites = false;
       return ok({ disconnected: true });
     },
   );

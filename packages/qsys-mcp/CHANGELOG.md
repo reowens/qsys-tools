@@ -6,6 +6,42 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Changed
+
+- **Live-Core writes are now fail-closed** (breaking for live-Core workflows):
+  every write tool checks the target BEFORE touching the wire and is refused
+  when the Core is not an emulator — or when the engine status is unknown —
+  unless the session was opened with `qsys_connect { allow_live_writes: true }`.
+  Permitted live writes still return the ⚠ warning. `qsys_save_snapshot` is now
+  gated and warned like every other write (it previously bypassed the warning).
+  Connecting to a live Core without the flag reports a note that writes are
+  disabled.
+- All 25 tools now declare MCP `readOnlyHint`/`destructiveHint` annotations so
+  clients can gate destructive calls without parsing descriptions.
+- The `test/live-write.ts` smoke script refuses to mutate a non-emulator target
+  unless `QSYS_LIVE_WRITE_OK=1` is set.
+
+### Fixed
+
+- **`qsys_loop_player_start` schema**: `loop`, `seek`, `log`, and `refId` moved
+  from the per-file entries to top-level tool params, matching the official QRC
+  `LoopPlayer.Start` shape (a `files[]` entry carries only `name` + `output`).
+  Previously the options were emitted inside each file entry, where a real Core
+  ignores them.
+- Connection state (`client`, engine status) is now scoped to the server
+  instance instead of module-global, a failed `qsys_connect` closes its
+  half-open candidate socket in every failure path (no leaked sockets on logon
+  or status failure), and interleaved connect calls can no longer clobber a
+  newer healthy connection (generation-tokened).
+- MCP transport closure (stdio EOF) now closes the QRC socket, so an orphaned
+  server process no longer holds an authenticated Core connection open.
+
+### Changed
+
+- Via qsys-qrc: a write whose response is lost to a connection drop now fails
+  with `QrcIndeterminateError` instead of being silently retransmitted (a blind
+  retry could double a trigger or playback start on a live system).
+
 ## [0.5.0] - 2026-07-09
 
 ### Added

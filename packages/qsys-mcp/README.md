@@ -18,7 +18,7 @@ It's a pure wire-protocol client: **zero QSC code**, no SDK, no hardware require
 - **No hardware needed** — develop entirely against Designer's Emulate-mode soft-core on `localhost`.
 - **Cross-platform** — `node:net` only; CI proves it on Linux + macOS × Node 22 & 24.
 - **Context-friendly** — list/get tools take `filter` / `names_only` / `type` so large designs don't flood the agent's context.
-- **Safe by default** — write tools warn when they're hitting a live Core (not an emulator); a 30 s `NoOp` keepalive holds the socket open through QRC's 60 s idle close.
+- **Safe by default** — write tools are **refused** on a live Core (or when the engine status is unknown) unless the session was opened with `qsys_connect { allow_live_writes: true }`; permitted live writes still carry a ⚠ warning, every tool declares MCP read-only/destructive annotations, and a 30 s `NoOp` keepalive holds the socket open through QRC's 60 s idle close.
 - **Self-healing** — on a dropped socket (Core restart, leaving Emulate, a network blip) the client auto-reconnects and replays your change-group registrations, so polling resumes without re-calling `qsys_connect`. Opt out with `reconnect: false`.
 
 ## Quick start
