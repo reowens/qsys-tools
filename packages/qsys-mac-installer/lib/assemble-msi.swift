@@ -120,6 +120,25 @@ func pathJoin(_ base: String, _ child: String) -> String {
     (base as NSString).appendingPathComponent(child)
 }
 
+/// Join an MSI-table-controlled relative path to a trusted root, refusing anything
+/// that could land outside it. MSI install paths are always plain relative paths,
+/// so an absolute or parent-relative component is hostile or corrupt metadata —
+/// abort the whole assembly rather than skip it.
+func safeJoin(root: String, child: String) throws -> String {
+    if child.hasPrefix("/") {
+        throw AssembleError(description: "assemble-msi: refusing absolute MSI path: \(child)")
+    }
+    if (child as NSString).pathComponents.contains("..") {
+        throw AssembleError(description: "assemble-msi: refusing parent-relative MSI path: \(child)")
+    }
+    let normRoot = (root as NSString).standardizingPath
+    let normJoined = (pathJoin(root, child) as NSString).standardizingPath
+    guard normJoined == normRoot || normJoined.hasPrefix(normRoot + "/") else {
+        throw AssembleError(description: "assemble-msi: MSI path escapes \(normRoot): \(child)")
+    }
+    return normJoined
+}
+
 func stripLeadingSlashes(_ value: String) -> String {
     var out = value
     while out.first == "/" {
@@ -189,12 +208,14 @@ func main() throws {
     var copied = 0
     var missing: [String] = []
     for (target, source) in chosen {
-        let absSource = pathJoin(srcRoot, source)
+        // Containment before every filesystem op: both sides are MSI-controlled.
+        let absSource = try safeJoin(root: srcRoot, child: source)
+        let absTarget = try safeJoin(root: app, child: target)
         guard isRegularFile(absSource) else {
             missing.append(source)
             continue
         }
-        try copyFile(from: absSource, to: pathJoin(app, target))
+        try copyFile(from: absSource, to: absTarget)
         copied += 1
     }
 

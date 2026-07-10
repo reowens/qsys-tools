@@ -40,7 +40,17 @@ final class Provisioner: ObservableObject {
         self.proc = proc
         proc.executableURL = URL(fileURLWithPath: "/bin/bash")
         proc.arguments = ["\(resources)/provision.sh", installer]
-        var env = ProcessInfo.processInfo.environment
+        // Allowlisted environment — packaged provisioning must NOT inherit developer
+        // overrides from the launching shell. The recipe honors WINEPREFIX / WINE_APP /
+        // RECIPE_SCHEMA / FULL_WIPE etc. via default-expansion, so an ambient
+        // FULL_WIPE=1 plus an inherited WINEPREFIX would rm -rf unrelated directories.
+        // Start from a minimal base and set every recipe-facing variable explicitly;
+        // developer overrides stay available by running lib/recipe.sh directly.
+        let ambient = ProcessInfo.processInfo.environment
+        var env: [String: String] = [:]
+        for key in ["HOME", "USER", "LOGNAME", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE", "TZ"] {
+            if let value = ambient[key] { env[key] = value }
+        }
         env["WRAP_HOME"] = DataDir.root
         // Point the recipe at bundled deps so first-run avoids Wine/.NET downloads and uses
         // our 7z/icoutils/msiinfo/native-helper binaries instead of host package-manager tools.

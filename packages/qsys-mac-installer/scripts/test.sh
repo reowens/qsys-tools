@@ -23,6 +23,44 @@ bash -n \
   "$ROOT/scripts/test.sh" \
   "$ROOT/scripts/update-homebrew-cask.sh"
 
+say "checking Designer launch-path WINEDLLOVERRIDES parity"
+# Every Designer launch path must set the same load-bearing overrides: mshtml=d (mscoree ON,
+# off breaks the managed loader) and mountmgr.sys=d (stops the /Volumes raw-device scan).
+# Three paths: launch.sh (dev), recipe.sh emit_app (generated .app), DataDir.swift (installed GUI).
+for pair in \
+  "$ROOT/launch.sh:WINEDLLOVERRIDES=\"mshtml=d;mountmgr.sys=d\"" \
+  "$ROOT/lib/recipe.sh:WINEDLLOVERRIDES=\"mshtml=d;mountmgr.sys=d\"" \
+  "$ROOT/app/Sources/Shared/DataDir.swift:env\[\"WINEDLLOVERRIDES\"\] = \"mshtml=d;mountmgr.sys=d\""; do
+  file="${pair%%:*}"; pattern="${pair#*:}"
+  grep -q "$pattern" "$file" || die "launch-path override drift: expected '$pattern' in $file"
+done
+
+say "checking MSI path-containment guard (malicious-table fixtures)"
+# Drives assemble-msi.py's safe_join with hostile MSI-style paths. The Swift
+# assembler mirrors the same rules (safeJoin) and is proven equivalent against
+# real installers by compare-assemble-msi.sh.
+python3 - "$ROOT/lib/assemble-msi.py" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("am", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+
+root = "/tmp/qsys-guard-root"
+# Benign shapes must pass and stay under root.
+for child in ("a.txt", "dir/sub/a.txt", "dir//a.txt", "weird..name/..file"):
+    joined = m.safe_join(root, child)
+    assert joined == root or joined.startswith(root + "/"), (child, joined)
+# Hostile shapes must abort the assembly (SystemExit).
+for child in ("../a.txt", "dir/../../a.txt", "/etc/passwd", "..", "a/../..", "../../../../tmp/x"):
+    try:
+        m.safe_join(root, child)
+    except SystemExit:
+        pass
+    else:
+        raise AssertionError(f"hostile path accepted: {child!r}")
+print("ok: safe_join rejects absolute/parent-relative MSI paths, accepts benign ones")
+PY
+
 if git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   say "checking diff whitespace"
   git -C "$REPO" diff --check -- packages/qsys-mac-installer

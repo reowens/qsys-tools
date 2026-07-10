@@ -82,6 +82,23 @@ def build_resolver(directory_rows):
     return resolve
 
 
+def safe_join(root, child):
+    """Join an MSI-table-controlled relative path to a trusted root, refusing
+    anything that could land outside it. MSI install paths are always plain
+    relative paths, so an absolute or parent-relative component is hostile or
+    corrupt metadata — abort the whole assembly rather than skip it.
+    (Keep in lockstep with safeJoin in assemble-msi.swift.)"""
+    if child.startswith("/"):
+        sys.exit(f"assemble-msi: refusing absolute MSI path: {child}")
+    if ".." in child.split("/"):
+        sys.exit(f"assemble-msi: refusing parent-relative MSI path: {child}")
+    root_norm = os.path.normpath(root)
+    joined = os.path.normpath(os.path.join(root, child))
+    if joined != root_norm and not joined.startswith(root_norm + os.sep):
+        sys.exit(f"assemble-msi: MSI path escapes {root_norm}: {child}")
+    return joined
+
+
 def main():
     if len(sys.argv) != 4:
         sys.exit("usage: assemble-msi.py <installer.msi> <src_root> <app_target_dir>")
@@ -118,11 +135,12 @@ def main():
     copied = 0
     missing = []
     for target, source in chosen.items():
-        abs_src = os.path.join(src_root, source)
+        # Containment before every filesystem op: both sides are MSI-controlled.
+        abs_src = safe_join(src_root, source)
+        abs_dst = safe_join(app, target)
         if not os.path.isfile(abs_src):
             missing.append(source)
             continue
-        abs_dst = os.path.join(app, target)
         os.makedirs(os.path.dirname(abs_dst), exist_ok=True)
         with open(abs_src, "rb") as fi, open(abs_dst, "wb") as fo:
             while True:

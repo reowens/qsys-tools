@@ -65,9 +65,19 @@ cmd_install() {
 
   say "Provisioning into $DATA_DIR …"
   # Same env the Swift Provisioner passes: the app's data dir + the bundled (offline,
-  # toolchain-free) deps. The @@QSYS:STEP@@/@@QSYS:EXTRACT@@ progress tokens are for the GUI;
-  # rewrite STEP to a readable line and drop the EXTRACT spam.
+  # toolchain-free) deps — on an ALLOWLISTED base (env -i), matching the GUI path.
+  # The recipe honors WINEPREFIX/WINE_APP/RECIPE_SCHEMA/FULL_WIPE via default-expansion,
+  # so packaged provisioning must not inherit them from the caller's shell: FULL_WIPE=1
+  # plus an inherited WINEPREFIX would rm -rf unrelated directories. Developer overrides
+  # stay available by running lib/recipe.sh directly. The @@QSYS:STEP@@/@@QSYS:EXTRACT@@
+  # progress tokens are for the GUI; rewrite STEP to a readable line, drop EXTRACT spam.
   local rc=0
+  /usr/bin/env -i \
+  HOME="$HOME" \
+  USER="${USER:-}" \
+  LOGNAME="${LOGNAME:-}" \
+  TMPDIR="${TMPDIR:-}" \
+  LANG="${LANG:-}" \
   WRAP_HOME="$DATA_DIR" \
   CACHE="$RES/cache" \
   QSYS_PREBUILT_APPMENU="$RES/bin/appmenu.dylib" \
