@@ -65,7 +65,7 @@
   "devDependencies": {
     "@types/node": "^22.5.0",
     "qsys-mock-core": "workspace:^",
-    "tsx": "^4.19.0",
+    "tsx": "^4.23.0",
     "typescript": "^5.6.0"
   }
 }
