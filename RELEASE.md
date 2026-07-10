@@ -26,6 +26,19 @@ Publishing is **tag-driven via GitHub Actions trusted publishing (OIDC)** — no
 `NPM_TOKEN`, no local OTP, and npm attaches build provenance automatically (public
 repo + public packages). See `.github/workflows/publish.yml`.
 
+The workflow gates every release before the publish step; a tag that fails any
+gate publishes nothing:
+
+- The tag must parse as `<pkg>-vX.Y.Z` and the version must **equal** that
+  package's `package.json` version — bump the manifest first, then tag.
+- The tagged commit must be an ancestor of `origin/main` (no side-branch releases).
+- Typecheck and the full test suite run on the exact tagged SHA (CI does not run
+  on tag pushes, so the publish workflow runs the gates itself).
+- The packed tarball is installed into an empty project as a consumer smoke test.
+- The job runs in the `npm-publish` environment; the MCP registry workflow uses
+  `mcp-registry`. **One-time setup:** in repo Settings → Environments, create both
+  environments and add required reviewers so publication needs an approval click.
+
 **One-time setup (per package, on npmjs.com):** for each of `qsys-qrc`, `qsys-cli`,
 `qsys-mcp`, `qsys-mac`, open `npmjs.com/package/<name>/access` → **Trusted Publishers**
 → add a **GitHub Actions** publisher: organization/user `reowens`, repository

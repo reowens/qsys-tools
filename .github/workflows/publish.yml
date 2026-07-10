@@ -5,6 +5,14 @@ name: Publish to npm
 # per-package tag (see RELEASE.md), e.g. `qsys-qrc-v0.2.1`, and this publishes that
 # one package. `qsys-mac-installer-v*` (the DMG) is a GitHub Release asset, not npm,
 # and is intentionally not matched here.
+#
+# Release gates (all must pass before the OIDC publish):
+#   1. the tag parses as <pkg>-v<semver> and the version EQUALS that package.json's version
+#   2. the tagged commit is an ancestor of origin/main (no side-branch releases)
+#   3. typecheck + the full test suite pass on the exact tagged SHA
+#   4. the packed tarball installs into an empty project and resolves as a consumer
+# Actions are pinned to reviewed commit SHAs; the `npm-publish` environment lets repo
+# Settings → Environments add required-reviewer approval in front of the publish.
 on:
   push:
     tags:
@@ -20,15 +28,47 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: npm-publish # protection rules (required reviewers) are configured in repo settings
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0 # full history so the main-ancestry gate can run
+
+      - name: Validate tag against package manifest and main
+        id: pkg
+        # qsys-qrc-v0.2.1 -> name=qsys-qrc, version=0.2.1 (dir packages/qsys-qrc;
+        # qsys-cli lives in packages/qsys). The tag version must EQUAL the package.json
+        # version, and the tagged commit must already be merged to main.
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          name="${tag%-v*}"
+          version="${tag##*-v}"
+          case "$name" in
+            qsys-qrc) dir=packages/qsys-qrc ;;
+            qsys-cli) dir=packages/qsys ;;
+            qsys-mcp) dir=packages/qsys-mcp ;;
+            qsys-mac) dir=packages/qsys-mac ;;
+            *) echo "::error::unrecognized package in tag '$tag'"; exit 1 ;;
+          esac
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::tag version '$version' is not a valid semver"; exit 1
+          fi
+          manifest="$(node -p "require('./$dir/package.json').version")"
+          if [ "$version" != "$manifest" ]; then
+            echo "::error::tag version '$version' != $dir/package.json version '$manifest'"; exit 1
+          fi
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::tagged commit $GITHUB_SHA is not on origin/main — release only merged commits"; exit 1
+          fi
+          echo "name=$name" >> "$GITHUB_OUTPUT"
 
       # pnpm does the workspace build + pack (it rewrites the `workspace:^` protocol
-      # to a real version); npm does the OIDC publish. Version comes from the root
-      # package.json "packageManager" field.
-      - uses: pnpm/action-setup@v4
+      # to a real version); npm does the OIDC publish.
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 24 # ships npm >= 11.5.1 (with sigstore) — required for trusted publishing + provenance
           registry-url: 'https://registry.npmjs.org'
@@ -42,17 +82,36 @@ jobs:
 
       - run: pnpm -r build
 
-      - name: Resolve package name from the tag
-        id: pkg
-        # qsys-qrc-v0.2.1 -> qsys-qrc ; qsys-cli-v0.1.3 -> qsys-cli (dir packages/qsys)
-        run: echo "name=${GITHUB_REF_NAME%-v*}" >> "$GITHUB_OUTPUT"
+      # CI does not run on tag pushes, so gate the release on the exact tagged SHA
+      # here instead of trusting that some branch build once passed.
+      - run: pnpm run typecheck
+
+      - run: pnpm test
 
       # pnpm pack bundles dist/ and rewrites workspace:^ -> a real range in the
-      # tarball's manifest; npm then publishes that tarball. Trusted publishing
-      # (OIDC) authenticates it with no token and attaches provenance.
-      - name: Pack (pnpm) and publish (npm, OIDC + provenance)
+      # tarball's manifest. Before publishing, install that tarball into an empty
+      # project as a real consumer: catches broken manifests, missing dist files,
+      # and unresolvable rewritten workspace ranges. `require.resolve` proves the
+      # declared entry point exists; qsys-mcp is not require()d because its main
+      # starts the stdio server. qsys-qrc (pure library) gets a real import check.
+      - name: Pack and smoke-test the tarball as a consumer
+        id: pack
         run: |
           set -euo pipefail
+          name="${{ steps.pkg.outputs.name }}"
           out="$RUNNER_TEMP/pkg"
-          pnpm --filter "${{ steps.pkg.outputs.name }}" pack --pack-destination "$out"
-          npm publish "$out"/*.tgz --access public --provenance
+          pnpm --filter "$name" pack --pack-destination "$out"
+          smoke="$RUNNER_TEMP/smoke"
+          mkdir -p "$smoke"
+          cd "$smoke"
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund "$out"/*.tgz
+          node -e "require.resolve('$name')"
+          if [ "$name" = "qsys-qrc" ]; then
+            node -e "const m = require('qsys-qrc'); if (typeof m.QrcClient !== 'function') throw new Error('QrcClient export missing')"
+          fi
+          echo "out=$out" >> "$GITHUB_OUTPUT"
+
+      # Trusted publishing (OIDC) authenticates with no token and attaches provenance.
+      - name: Publish (npm, OIDC + provenance)
+        run: npm publish "${{ steps.pack.outputs.out }}"/*.tgz --access public --provenance

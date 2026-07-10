@@ -1,5 +1,12 @@
 name: Publish qsys-mcp to MCP Registry
 
+# Manually dispatched. The publisher binary is pinned to an exact release and
+# checksum-verified before it runs with this job's OIDC authority — never `latest`
+# (a moving artifact would be arbitrary code execution in a registry-authorized
+# job). To upgrade: bump MCP_PUBLISHER_VERSION and take the matching sha256 for
+# mcp-publisher_linux_amd64.tar.gz from that release's registry_<ver>_checksums.txt.
+# The `mcp-registry` environment lets repo Settings → Environments add
+# required-reviewer approval in front of publication.
 on:
   workflow_dispatch:
 
@@ -10,12 +17,19 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: mcp-registry # protection rules (required reviewers) are configured in repo settings
+    env:
+      MCP_PUBLISHER_VERSION: v1.7.9
+      MCP_PUBLISHER_SHA256: ab128162b0616090b47cf245afe0a23f3ef08936fdce19074f5ba0a4469281ac
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
-      - name: Install mcp-publisher
+      - name: Install mcp-publisher (pinned + checksum-verified)
         run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          set -euo pipefail
+          curl -fsSLo mcp-publisher.tar.gz "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
+          echo "${MCP_PUBLISHER_SHA256}  mcp-publisher.tar.gz" | sha256sum -c -
+          tar xzf mcp-publisher.tar.gz mcp-publisher
 
       - name: Validate registry manifest
         working-directory: packages/qsys-mcp
