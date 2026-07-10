@@ -6,6 +6,43 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- **`LoopPlayer.Start` wire shape**: `Loop`, `Seek`, `Log`, and `RefID` are now
+  emitted at the top level of the request params, per the official QRC spec — a
+  `Files[]` entry carries only `Name` and `Output`. Previously the four options
+  were nested inside each file entry, where a real Core ignores them (playback
+  didn't loop, seek/log/refId were dropped). **Breaking**: the options moved from
+  `LoopPlayerFile` to `LoopPlayerStartParams` and now apply to the whole job.
+
+### Changed
+
+- **Reconnect retry is now delivery-safe**: when a connection drops after a
+  request was sent but before its response arrived, only methods classified
+  idempotent (reads, change-group registration, `Logon`, `NoOp`) are retried
+  transparently. A non-idempotent request (`Control.Set`, `Component.Set`,
+  `Mixer.*`, `LoopPlayer.*`, `Snapshot.*`, unknown raw methods) rejects with the
+  new `QrcIndeterminateError` — QRC has no request dedup, so a blind retransmit
+  could double a trigger or playback start. A request that provably never
+  reached the socket is still retried regardless of method.
+- `isConnected()` now reports full session readiness (post logon/change-group
+  replay), not merely a TCP-connected socket; requests issued mid-reconnect wait
+  for the replay to finish instead of racing it.
+
+### Added
+
+- `QrcIndeterminateError` (exported): distinct error for sent-but-unacknowledged
+  mutations, carrying the QRC `method`.
+- `maxBufferBytes` option (default 4 MiB): input with no frame terminator beyond
+  the cap closes the socket instead of growing the receive buffer without bound.
+- Defensive frame validation: valid-JSON-but-non-object frames (`null`, numbers,
+  arrays) emit `'error'` instead of crashing dispatch.
+- `close()` now cancels an in-progress dial, so shutdown can never leave a live
+  connection behind.
+- Package-owned transport test suite (`pnpm --filter qsys-qrc test`) with
+  failure injection: lost responses, mid-reconnect requests, malformed and
+  oversized frames, close-during-dial, and timeout-vs-drop classification.
+
 ## [0.4.0] - 2026-07-09
 
 ### Added

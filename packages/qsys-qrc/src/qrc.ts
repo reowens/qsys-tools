@@ -20,6 +20,12 @@ export interface QrcClientOptions {
   reconnectMaxMs?: number;
   /** Consecutive background reconnect attempts before giving up until the next request (default 8). */
   reconnectMaxAttempts?: number;
+  /**
+   * Max bytes buffered while waiting for a frame's null terminator (default 4 MiB).
+   * A peer that exceeds it (malformed, compromised, or not speaking QRC) gets its
+   * socket destroyed instead of exhausting process memory.
+   */
+  maxBufferBytes?: number;
 }
 
 interface Pending {
@@ -51,6 +57,48 @@ export class QrcError extends Error {
 }
 
 /**
+ * The request was transmitted but the connection dropped before its response
+ * arrived: the Core may or may not have applied it, and QRC has no dedup
+ * mechanism to find out. Raised only for methods NOT classified idempotent
+ * (those are retried transparently). Callers should re-read state to reconcile,
+ * or re-issue explicitly once they've decided a duplicate is acceptable.
+ */
+export class QrcIndeterminateError extends Error {
+  readonly method: string;
+  constructor(method: string) {
+    super(`QRC delivery indeterminate: the connection dropped after '${method}' was sent but before its response arrived — the Core may or may not have applied it`);
+    this.name = 'QrcIndeterminateError';
+    this.method = method;
+  }
+}
+
+/**
+ * Methods safe to retransmit when a response is lost to a connection drop:
+ * reads, session/registration setup (re-asserting is a no-op), and removals
+ * (already-gone is the desired state). Everything else — Control/Component/Mixer
+ * sets, LoopPlayer, Snapshot, PA, raw send() of unknown methods — fails closed
+ * with QrcIndeterminateError, because a duplicate could fire triggers, restart
+ * playback, or re-run control logic on a live system.
+ */
+const IDEMPOTENT_METHODS: ReadonlySet<string> = new Set([
+  'NoOp',
+  'StatusGet',
+  'Logon',
+  'Component.GetComponents',
+  'Component.GetControls',
+  'Component.Get',
+  'Control.Get',
+  'ChangeGroup.AddControl',
+  'ChangeGroup.AddComponentControl',
+  'ChangeGroup.Remove',
+  'ChangeGroup.Poll',
+  'ChangeGroup.Clear',
+  'ChangeGroup.Destroy',
+  'ChangeGroup.Invalidate',
+  'ChangeGroup.AutoPoll',
+]);
+
+/**
  * Q-SYS Remote Control (QRC) client.
  * Speaks JSON-RPC 2.0 over a raw TCP socket (default port 1710), framed with
  * null terminators — the wire format QSC documents and that the Designer
@@ -69,12 +117,18 @@ export class QrcClient extends EventEmitter {
   private readonly reconnectInitialMs: number;
   private readonly reconnectMaxMs: number;
   private readonly reconnectMaxAttempts: number;
+  private readonly maxBufferBytes: number;
   private socket: net.Socket | null = null;
+  /** Socket mid-dial (TCP connect not yet completed) so close() can cancel it. */
+  private dialing: net.Socket | null = null;
   private buf = '';
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
   private keepAliveTimer: NodeJS.Timeout | null = null;
-  private connected = false;
+  /** Transport is up (frames can be written). True during session replay. */
+  private socketConnected = false;
+  /** Transport is up AND logon/change-group replay finished — safe for callers. */
+  private sessionReady = false;
   private explicitlyClosed = false;
   private reconnectPromise: Promise<void> | null = null;
   private logonCreds: { user: string; password: string } | null = null;
@@ -90,28 +144,53 @@ export class QrcClient extends EventEmitter {
     this.reconnectInitialMs = opts.reconnectInitialMs ?? 500;
     this.reconnectMaxMs = opts.reconnectMaxMs ?? 10_000;
     this.reconnectMaxAttempts = opts.reconnectMaxAttempts ?? 8;
+    this.maxBufferBytes = opts.maxBufferBytes ?? 4 * 1024 * 1024;
   }
 
+  /** True once the session is fully established (post-replay) — not merely TCP-connected. */
   isConnected(): boolean {
-    return this.connected;
+    return this.sessionReady;
   }
 
   async connect(): Promise<void> {
     this.explicitlyClosed = false;
     await this.openSocket();
+    // A fresh connect has no session state to replay (close() clears creds/groups).
+    this.sessionReady = true;
   }
 
-  /** Open a fresh socket and wire its handlers. Rejects if the TCP connect fails. */
+  /** Open a fresh socket and wire its handlers. Rejects if the TCP connect fails
+   *  or close() is called mid-dial — an explicit shutdown never resurrects a link. */
   private openSocket(): Promise<void> {
     return new Promise((resolve, reject) => {
       const sock = net.createConnection({ host: this.host, port: this.port });
+      this.dialing = sock;
       sock.setEncoding('utf8');
-      const onConnectError = (e: Error) => reject(e);
+      const settleDial = () => {
+        if (this.dialing === sock) this.dialing = null;
+      };
+      const onConnectError = (e: Error) => {
+        settleDial();
+        reject(e);
+      };
+      // close() destroys the dialing socket; without this the promise would hang.
+      const onDialClose = () => {
+        settleDial();
+        reject(new Error('QRC client closed'));
+      };
       sock.once('error', onConnectError);
+      sock.once('close', onDialClose);
       sock.once('connect', () => {
         sock.removeListener('error', onConnectError);
+        sock.removeListener('close', onDialClose);
+        settleDial();
+        if (this.explicitlyClosed) {
+          sock.destroy();
+          reject(new Error('QRC client closed'));
+          return;
+        }
         this.socket = sock;
-        this.connected = true;
+        this.socketConnected = true;
         this.buf = '';
         sock.on('data', (chunk: Buffer | string) => this.onData(typeof chunk === 'string' ? chunk : chunk.toString('utf8')));
         sock.on('error', (e: Error) => this.emitError(e));
@@ -124,19 +203,33 @@ export class QrcClient extends EventEmitter {
 
   private onData(chunk: string): void {
     this.buf += chunk;
+    if (this.buf.length > this.maxBufferBytes) {
+      // No terminator within the cap: the peer is not framing QRC. Drop the data
+      // and the socket rather than growing the buffer without bound.
+      this.buf = '';
+      this.emitError(new Error(`QRC receive buffer exceeded ${this.maxBufferBytes} bytes without a frame terminator — closing socket`));
+      this.socket?.destroy();
+      return;
+    }
     let idx: number;
     while ((idx = this.buf.indexOf('\0')) !== -1) {
       const raw = this.buf.slice(0, idx);
       this.buf = this.buf.slice(idx + 1);
       if (!raw.trim()) continue;
-      let msg: Record<string, unknown>;
+      let msg: unknown;
       try {
-        msg = JSON.parse(raw) as Record<string, unknown>;
+        msg = JSON.parse(raw);
       } catch {
         this.emitError(new Error(`QRC parse error: ${raw.slice(0, 200)}`));
         continue;
       }
-      this.dispatch(msg);
+      // Valid JSON is not necessarily a valid envelope: `null`, numbers, strings,
+      // and arrays would crash dispatch()'s property access — reject them here.
+      if (msg === null || typeof msg !== 'object' || Array.isArray(msg)) {
+        this.emitError(new Error(`QRC invalid frame (expected a JSON-RPC object): ${raw.slice(0, 200)}`));
+        continue;
+      }
+      this.dispatch(msg as Record<string, unknown>);
     }
   }
 
@@ -160,24 +253,46 @@ export class QrcClient extends EventEmitter {
   /**
    * Send a JSON-RPC request and await the correlated response. If the socket is
    * down (or drops mid-request) and auto-reconnect is enabled, this waits for a
-   * reconnect and retries once — connection drops are transparent to callers.
+   * reconnect and retries once — but ONLY when the retry is provably safe:
+   * either the request never reached the socket, or the method is classified
+   * idempotent. A non-idempotent request whose response is lost rejects with
+   * QrcIndeterminateError instead of silently executing twice (QRC has no
+   * request dedup, so a blind retransmit can double a mutation).
    */
   async send(method: string, params?: unknown): Promise<unknown> {
-    if (!this.connected) await this.ensureReconnected();
+    if (!this.sessionReady) await this.ensureReconnected();
     try {
       return await this.sendOnce(method, params);
     } catch (err) {
-      if (this.shouldRetryAfterDrop(err)) {
+      const kind = this.classifyDrop(err);
+      if (kind === 'response-lost' && !IDEMPOTENT_METHODS.has(method)) {
+        throw new QrcIndeterminateError(method);
+      }
+      if (kind !== null && this.reconnectEnabled && !this.explicitlyClosed) {
         await this.ensureReconnected();
-        if (this.connected) return await this.sendOnce(method, params);
+        if (this.sessionReady) return await this.sendOnce(method, params);
       }
       throw err;
     }
   }
 
-  /** One request attempt on the current socket — no reconnect handling. */
+  /**
+   * How a request failed relative to the wire: 'never-sent' (rejected before the
+   * frame was written — retrying anything is safe), 'response-lost' (written,
+   * then the connection dropped — the Core may have applied it), or null (not a
+   * connection failure; e.g. a timeout with the socket still up).
+   */
+  private classifyDrop(err: unknown): 'never-sent' | 'response-lost' | null {
+    const m = (err as Error)?.message ?? '';
+    if (m.includes('QRC not connected')) return 'never-sent';
+    if (m.includes('QRC connection closed')) return 'response-lost';
+    return null;
+  }
+
+  /** One request attempt on the current socket — no reconnect handling. Gated on
+   *  the transport (not session-ready) because replayState() itself uses it. */
   private sendOnce(method: string, params?: unknown): Promise<unknown> {
-    if (!this.socket || !this.connected) {
+    if (!this.socket || !this.socketConnected) {
       return Promise.reject(new Error('QRC not connected — call connect() first'));
     }
     const id = this.nextId++;
@@ -192,16 +307,9 @@ export class QrcClient extends EventEmitter {
     });
   }
 
-  /** A connection drop is retryable; a timeout (socket still up) is not. */
-  private shouldRetryAfterDrop(err: unknown): boolean {
-    if (this.explicitlyClosed || !this.reconnectEnabled) return false;
-    const m = (err as Error)?.message ?? '';
-    return m.includes('QRC connection closed') || m.includes('QRC not connected');
-  }
-
   /** Fire-and-forget notification (no id, no response expected). */
   notify(method: string, params?: unknown): void {
-    if (!this.socket || !this.connected) return;
+    if (!this.socket || !this.socketConnected) return;
     this.socket.write(JSON.stringify({ jsonrpc: '2.0', method, params: params ?? null }) + '\0');
   }
 
@@ -219,7 +327,8 @@ export class QrcClient extends EventEmitter {
   }
 
   private onClose(): void {
-    this.connected = false;
+    this.socketConnected = false;
+    this.sessionReady = false;
     this.stopKeepAlive();
     for (const p of this.pending.values()) {
       clearTimeout(p.timer);
@@ -235,9 +344,9 @@ export class QrcClient extends EventEmitter {
     }
   }
 
-  /** Resolve once connected, driving (or joining) a reconnect attempt as needed. */
+  /** Resolve once the session is ready, driving (or joining) a reconnect attempt as needed. */
   private ensureReconnected(): Promise<void> {
-    if (this.connected) return Promise.resolve();
+    if (this.sessionReady) return Promise.resolve();
     if (this.explicitlyClosed || !this.reconnectEnabled) return Promise.resolve();
     if (!this.reconnectPromise) {
       this.reconnectPromise = this.runReconnect().finally(() => {
@@ -261,6 +370,13 @@ export class QrcClient extends EventEmitter {
       try {
         await this.openSocket();
         await this.replayState();
+        // close() may have raced the dial or the replay — never resurrect after
+        // an explicit shutdown.
+        if (this.explicitlyClosed) {
+          this.teardownSocket();
+          return;
+        }
+        this.sessionReady = true;
         this.emit('reconnected');
         return;
       } catch (err) {
@@ -307,7 +423,8 @@ export class QrcClient extends EventEmitter {
       this.socket.destroy();
       this.socket = null;
     }
-    this.connected = false;
+    this.socketConnected = false;
+    this.sessionReady = false;
   }
 
   private sleep(ms: number): Promise<void> {
@@ -320,11 +437,17 @@ export class QrcClient extends EventEmitter {
   close(): void {
     this.explicitlyClosed = true;
     this.stopKeepAlive();
+    if (this.dialing) {
+      // Cancel an in-progress dial so shutdown can't leave a live connection behind.
+      this.dialing.destroy();
+      this.dialing = null;
+    }
     if (this.socket) {
       this.socket.end();
       this.socket = null;
     }
-    this.connected = false;
+    this.socketConnected = false;
+    this.sessionReady = false;
     this.changeGroups.clear();
     this.logonCreds = null;
   }
@@ -525,24 +648,23 @@ export class QrcClient extends EventEmitter {
 
   /**
    * Schedule file playback on a Loop Player (LoopPlayer.Start). `files` is the full array —
-   * one object per output. Optional per-file `loop`/`seek`/`log`/`refId` and top-level
-   * `startTime` are omitted from the wire when unset, letting the Core apply its documented
-   * defaults (loop=false, seek=0, startTime=0). `refId` requests an async failure notification
-   * — the notification itself isn't surfaced yet (no push channel), but the Core still logs it.
+   * one Name/Output object per output. `loop`/`seek`/`log`/`refId` and `startTime` are
+   * TOP-LEVEL request params applying to the whole job (per the QRC spec — a Files entry
+   * carries only Name/Output); unset options are omitted from the wire, letting the Core apply
+   * its documented defaults (loop=false, seek=0, startTime=0). `refId` requests an async
+   * failure notification — the notification itself isn't surfaced yet (no push channel), but
+   * the Core still logs it.
    */
   loopPlayerStart(params: LoopPlayerStartParams): Promise<unknown> {
     const p: Record<string, unknown> = {
       Name: params.name,
-      Files: params.files.map((f) => {
-        const o: Record<string, unknown> = { Name: f.name, Output: f.output };
-        if (f.loop != null) o.Loop = f.loop;
-        if (f.seek != null) o.Seek = f.seek;
-        if (f.log != null) o.Log = f.log;
-        if (f.refId != null) o.RefID = f.refId;
-        return o;
-      }),
+      Files: params.files.map((f) => ({ Name: f.name, Output: f.output })),
     };
     if (params.startTime != null) p.StartTime = params.startTime;
+    if (params.loop != null) p.Loop = params.loop;
+    if (params.seek != null) p.Seek = params.seek;
+    if (params.log != null) p.Log = params.log;
+    if (params.refId != null) p.RefID = params.refId;
     return this.send('LoopPlayer.Start', p);
   }
 
@@ -574,20 +696,13 @@ export class QrcClient extends EventEmitter {
 export type ControlValue = number | string | boolean;
 
 /** One file→output assignment in a LoopPlayer.Start. Lowercase here; mapped to QRC casing
- *  (Name/Output/Loop/Seek/Log/RefID) on the wire, undefined optionals omitted. */
+ *  (Name/Output) on the wire. Per the QRC spec a Files entry carries ONLY these two fields —
+ *  loop/seek/log/refId are top-level params on LoopPlayerStartParams. */
 export interface LoopPlayerFile {
   /** Path + filename of the file to play, as it exists on the Core. */
   name: string;
   /** Output track number to play on. */
   output: number;
-  /** Loop the file continuously (default false). */
-  loop?: boolean;
-  /** Offset into the file to start at, in seconds (default 0). */
-  seek?: number;
-  /** Log start + errors to the Core event log (default false). */
-  log?: boolean;
-  /** If set, the Core sends an async failure notification (+ event-log entry) for this job. */
-  refId?: string;
 }
 
 export interface LoopPlayerStartParams {
@@ -597,6 +712,14 @@ export interface LoopPlayerStartParams {
   startTime?: number;
   /** One or more file→output assignments. */
   files: LoopPlayerFile[];
+  /** Loop playback continuously (default false). Applies to the whole job. */
+  loop?: boolean;
+  /** Offset into the file to start playback, in seconds (default 0). */
+  seek?: number;
+  /** Log the start message + errors to the Core event log (default false). */
+  log?: boolean;
+  /** If set, the Core sends an async failure notification (+ event-log entry) for this job. */
+  refId?: string;
 }
 
 export interface EngineStatus {

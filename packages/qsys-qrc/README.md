@@ -37,8 +37,11 @@ Typed helpers cover the whole protocol surface: status, components,
 named controls, change groups (poll-based watch), and snapshots.
 
 The client keeps the socket alive (`NoOp` keepalive) and reconnects
-transparently if the Core drops the connection; in-flight requests are
-rejected, subsequent ones reuse the new socket.
+transparently if the Core drops the connection. In-flight **reads** are
+retried on the new socket; an in-flight **mutation** whose response was
+lost rejects with `QrcIndeterminateError` instead of being retransmitted —
+QRC has no request dedup, so a blind retry could double a trigger or
+playback start. Re-read state (or re-issue explicitly) to reconcile.
 
 ## Disclaimer
 
