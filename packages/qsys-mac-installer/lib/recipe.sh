@@ -174,6 +174,24 @@ native_helper_path() {  # $1 = override env var name  $2 = command name
 # ----------------------------------------------------------------------------
 # Preflight
 # ----------------------------------------------------------------------------
+# The .NET installer needs a macOS GUI (Aqua) session to create its window; a headless SSH-only
+# login can't reach one (Wine's winemac.drv → nodrv_CreateWindow), so the runtime installs NOTHING.
+# install_dotnet's landing assertion catches that, but only after a ~250 MB download and two install
+# attempts — refuse up front instead. Fire only when we're CONFIDENT it's headless: reached over SSH
+# AND no user owns the GUI console (/dev/console == root). Deliberately high-precision so we never
+# false-block a working setup — a local Terminal (no SSH_CONNECTION) and a screen-sharing/VNC session
+# (which owns the console) both read as NOT headless, as does the ambiguous "SSH in while also logged
+# in at the screen" case (left to the install_dotnet backstop). `launchctl managername` was rejected:
+# it returns "Background" in a plain local Terminal too, so it would block valid local runs.
+# QSYS_ASSUME_GUI=1 forces past the check. The GUI app path always runs inside Aqua with
+# SSH_CONNECTION unset (Provisioner → provision.sh from a LaunchServices-launched app), so this never
+# fires there — it only ever guards a direct provision.sh/build.sh run over SSH.
+is_headless_ssh() {
+  [ "${QSYS_ASSUME_GUI:-0}" = "1" ] && return 1
+  [ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ] || return 1
+  [ "$(stat -f%Su /dev/console 2>/dev/null)" = "root" ]
+}
+
 preflight() {
   [ "$(uname -s)" = "Darwin" ] || die "macOS only."
   [ "$(uname -m)" = "arm64" ]  || warn "Not Apple Silicon — the recipe was proven on arm64 + Rosetta 2 only."
@@ -190,6 +208,7 @@ preflight() {
   command -v curl >/dev/null 2>&1 || die "curl missing."
   command -v wrestool >/dev/null 2>&1 || warn "icoutils missing (brew install icoutils) — the app will use a generic icon."
   /usr/bin/pgrep -q oahd 2>/dev/null || warn "Rosetta 2 may not be installed. Install:  softwareupdate --install-rosetta --agree-to-license"
+  if is_headless_ssh; then die "Headless SSH session detected (no user owns the GUI console) — the .NET installer needs a macOS GUI (Aqua) session to create its window, which Wine's winemac.drv can't reach over SSH (nodrv_CreateWindow); provisioning would download the runtime and then fail. Provision from the desktop, or from a Terminal inside a logged-in GUI session. If a GUI session really is reachable (e.g. screen sharing), re-run with QSYS_ASSUME_GUI=1."; fi
 }
 
 # Fail fast before the long pole if the volume can't hold the work. WRAP_HOME must already exist so
