@@ -66,6 +66,30 @@ if git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git -C "$REPO" diff --check -- packages/qsys-mac-installer
 fi
 
+say "checking headless-SSH pre-flight probe"
+# is_headless_ssh() must fire ONLY on SSH + an unowned GUI console (/dev/console == root), and
+# QSYS_ASSUME_GUI=1 must force past it. Mock the console owner via a PATH `stat` shim and vary
+# SSH_CONNECTION so the check is hermetic (no real session/console needed).
+(
+  # shellcheck source=../lib/recipe.sh
+  source "$ROOT/lib/recipe.sh"
+  shim="$(mktemp -d)"
+  trap 'rm -rf "$shim"' EXIT
+  export PATH="$shim:$PATH"
+  console_owner() { printf '#!/bin/bash\necho %s\n' "$1" > "$shim/stat"; chmod +x "$shim/stat"; }
+  # subshell body so the per-case env never leaks to the next case
+  probe() ( export SSH_CONNECTION="$1" SSH_TTY="" QSYS_ASSUME_GUI="$2"; is_headless_ssh )
+
+  console_owner root
+  probe "1.2.3.4 5 22 22" 0 || die "probe missed a headless SSH session (SSH + console=root)"
+  if probe "" 0;                then die "probe fired on a local (non-SSH) session"; fi
+  console_owner someuser
+  if probe "1.2.3.4 5 22 22" 0; then die "probe fired when a user owns the GUI console (e.g. screen sharing)"; fi
+  console_owner root
+  if probe "1.2.3.4 5 22 22" 1; then die "QSYS_ASSUME_GUI=1 did not override the probe"; fi
+)
+say "  ok: probe fires only on SSH + unowned console, honors QSYS_ASSUME_GUI"
+
 say "checking process cleanup harness"
 "$ROOT/scripts/test-process-cleanup.sh"
 
