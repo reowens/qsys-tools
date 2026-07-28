@@ -7,7 +7,7 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-export const CLI_VERSION = '0.1.6';
+export const CLI_VERSION = '0.1.7';
 
 export interface ReleaseInfo {
   version: string;
@@ -19,11 +19,11 @@ export interface ReleaseInfo {
 }
 
 export const DEFAULT_RELEASE: ReleaseInfo = {
-  version: '0.1.6',
-  tag: 'qsys-mac-installer-v0.1.6',
+  version: '0.1.7',
+  tag: 'qsys-mac-installer-v0.1.7',
   assetName: 'qsys-mac-installer.dmg',
-  url: 'https://github.com/reowens/qsys-tools/releases/download/qsys-mac-installer-v0.1.6/qsys-mac-installer.dmg',
-  sha256: 'a33d0fccd2aaf87a24bdbd69318659a8366ce95f59155c74747b1d9ba64ea52e',
+  url: 'https://github.com/reowens/qsys-tools/releases/download/qsys-mac-installer-v0.1.7/qsys-mac-installer.dmg',
+  sha256: '5968ff8d7a58cee2d247773069b347a885305aa7a3cbfd2f729730564e481998',
   installerApp: 'Q-SYS Mac Installer.app',
 };
 

@@ -6,6 +6,16 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-07-27
+
+### Changed
+
+- `DEFAULT_RELEASE` now points at the `qsys-mac-installer 0.1.7` signed DMG,
+  which adds the fail-fast pre-flight for headless-SSH .NET installs and the
+  installer-side audit remediation (MSI path containment, allowlisted
+  provisioning environment, launcher `WINEDLLOVERRIDES` parity).
+- Raised the Node engines floor to `>=22.13`.
+
 ## [0.1.6] - 2026-07-09
 
 ### Changed
