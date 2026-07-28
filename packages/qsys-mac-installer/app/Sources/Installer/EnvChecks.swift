@@ -58,6 +58,58 @@ enum EnvChecks {
             || fm.fileExists(atPath: "/Library/Little Snitch")
     }
 
+    /// Can this process actually use TCP loopback? Bind an ephemeral listener on 127.0.0.1 and
+    /// connect to it. Presence of a firewall app says nothing about whether loopback is *blocked*,
+    /// and loopback can equally be blocked by LuLu, Radio Silence, pf rules, or an MDM profile —
+    /// so probe the capability itself rather than inferring from an installed bundle.
+    ///
+    /// Fails SAFE: every inconclusive outcome (socket/bind/listen unavailable) returns false, so a
+    /// probe that cannot run never accuses the user's firewall. Only a bound listener plus a failed
+    /// connect counts as blocked.
+    ///
+    /// Port 0 lets the kernel pick a free port, so this cannot collide with anything in use.
+    ///
+    /// CAVEAT: these filters are per-process. A pass proves only that *the installer* may use
+    /// loopback — Designer is a different binary and can still be prompted for separately.
+    static var loopbackBlocked: Bool {
+        let listenFd = socket(AF_INET, SOCK_STREAM, 0)
+        guard listenFd >= 0 else { return false }
+        defer { close(listenFd) }
+
+        var addr = sockaddr_in()
+        addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = 0                                   // kernel-assigned
+        addr.sin_addr.s_addr = inet_addr("127.0.0.1")
+
+        let bound = withUnsafePointer(to: &addr) { p in
+            p.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                bind(listenFd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) == 0
+            }
+        }
+        guard bound, listen(listenFd, 1) == 0 else { return false }
+
+        // Read back the kernel-assigned port.
+        var live = sockaddr_in()
+        var len = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let named = withUnsafeMutablePointer(to: &live) { p in
+            p.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                getsockname(listenFd, $0, &len) == 0
+            }
+        }
+        guard named else { return false }
+
+        let clientFd = socket(AF_INET, SOCK_STREAM, 0)
+        guard clientFd >= 0 else { return false }
+        defer { close(clientFd) }
+        let connected = withUnsafePointer(to: &live) { p in
+            p.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                connect(clientFd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) == 0
+            }
+        }
+        return !connected
+    }
+
     /// Resolve the live notices. Spawns a subprocess (the Rosetta probe) — call once, off the
     /// render path (the view caches the result).
     static var notices: [EnvNotice] {
@@ -69,11 +121,21 @@ enum EnvChecks {
                 detail: "Q-SYS Designer runs x86_64 Wine under Rosetta 2, which isn’t installed yet. Install it to continue.",
                 action: .installRosetta))
         }
-        if littleSnitchPresent {
+        // A measured block is a real finding — lead with it, and don't name a vendor we haven't
+        // confirmed. Stays an advisory, not a blocker: provisioning and launching still work,
+        // only the web panes break, so this must not gate the install.
+        if loopbackBlocked {
+            out.append(EnvNotice(
+                kind: .advisory,
+                title: "Loopback (127.0.0.1) is blocked",
+                detail: "A firewall is blocking local connections. Q-SYS Designer installs and runs, but the script-editor, help, and splash panes will be blank until you allow 127.0.0.1 for it."))
+        } else if littleSnitchPresent {
+            // Loopback works for *us*, but these rules are per-app — Designer will be asked about
+            // separately, so this stays a heads-up rather than a claim that something is broken.
             out.append(EnvNotice(
                 kind: .advisory,
                 title: "Little Snitch detected",
-                detail: "Allow Q-SYS Designer's 127.0.0.1 (loopback) connection in Little Snitch, or the script-editor and help panes stay blank."))
+                detail: "Loopback works for this installer, but rules are per-app. Allow Q-SYS Designer's 127.0.0.1 (loopback) connection when prompted, or the script-editor and help panes stay blank."))
         }
         return out
     }
