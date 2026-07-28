@@ -88,6 +88,21 @@ prebuilt prefix without the `.app` (dev/debug), use `./launch.sh`.
    - **`127.0.0.1` (loopback) — ALLOW, required.** CEF and the embedded emulator
      HTTP server (which serves the Monaco editor + help panes) talk over loopback — block
      it and **every web pane stays blank.** This looks exactly like a render failure but isn't.
+
+     **If the panes are blank, check this first:**
+
+     ```sh
+     qsys-mac doctor        # Host → TCP loopback
+     ```
+
+     That line runs a real bind-and-connect probe rather than looking for a firewall app, so
+     it also covers LuLu, Radio Silence, `pf` rules, and MDM-pushed firewalls — Little Snitch
+     is just the common case. `BLOCKED` is a definite finding; `inconclusive` means the probe
+     couldn't run and is **not** an accusation.
+
+     One caveat the output states too: these rules are **per-process**. `ok` proves the
+     *helper* may use loopback — Designer is a separate binary and can still be blocked on its
+     own, so allow it when prompted regardless.
    - **`224.0.0.251:5353` (mDNS / Bonjour multicast) — optional.** This is Q-SYS LAN
      device discovery: Designer multicasts to find Cores and peripherals on your network.
      **Allow** it if you want Designer to auto-discover a real Core on the LAN; **deny** it
@@ -296,7 +311,9 @@ internals behind it would change.
 - **Little Snitch: likely `Q-SYS Designer`, possibly `wine`** — the patched embedded
   plist also sets `CFBundleIdentifier`, which Little Snitch may adopt. If it still shows
   `wine` (its own binary identity), that's cosmetic — just allow the process once
-  (loopback rule below).
+  (loopback rule below). Because the rule attaches to whichever identity it shows, allowing
+  the *installer* does not cover Designer; `qsys-mac doctor`'s `TCP loopback` line says as
+  much, and is the quickest way to tell a blocked loopback from a genuine render bug.
 - **Dock/app icon: `Q-SYS Designer` ✅** — extracted from `Q-Sys Designer.exe` at build
   time (`wrestool` → `icotool` → padded to a macOS-style margin → `iconutil` →
   `QSYSDesigner.icns`), set via `CFBundleIconFile` and re-forced at runtime by the shim.
