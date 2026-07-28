@@ -6,6 +6,16 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-07-28
+
+### Changed
+
+- `DEFAULT_RELEASE` now points at the `qsys-mac-installer 0.1.8` signed DMG, which
+  adds a real TCP-loopback probe to `qsys-mac doctor` and makes the installer's
+  setup UI report a *measured* loopback block instead of inferring one from
+  Little Snitch being installed. A blocked `127.0.0.1` renders Designer's script
+  editor, help, and splash panes blank with no error, so it is now diagnosable.
+
 ## [0.1.7] - 2026-07-27
 
 ### Changed
