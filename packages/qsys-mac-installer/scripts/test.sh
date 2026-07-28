@@ -90,6 +90,48 @@ say "checking headless-SSH pre-flight probe"
 )
 say "  ok: probe fires only on SSH + unowned console, honors QSYS_ASSUME_GUI"
 
+say "checking loopback probe (qsys-mac doctor)"
+# loopback_status() must never cry wolf: "BLOCKED" is only legitimate when a listener was
+# demonstrably in LISTEN and the connect still failed. Two traps this guards against —
+# (1) `nc -l` LINGERS instead of exiting when the port is already taken, so process-alive is
+# not a bind test; (2) if the probe itself can't run, that is inconclusive, not a firewall
+# problem. Hermetic: shims lsof rather than needing a real firewall.
+(
+  # shellcheck source=../qsys-mac
+  # Pull in just the function — running the helper would execute a command.
+  eval "$(sed -n '/^loopback_status()/,/^}/p' "$ROOT/qsys-mac")"
+  shim="$(mktemp -d)"
+  trap 'rm -rf "$shim"' EXIT
+
+  out="$(loopback_status)"
+  case "$out" in
+    ok*) ;;
+    *) die "loopback probe did not report ok on a machine with working loopback (got: $out)" ;;
+  esac
+
+  # Ports already occupied: loopback still demonstrably works, so this must stay "ok" —
+  # a busy port is not evidence of blocking.
+  # disown so bash's job control doesn't print "Terminated: 15" when we reap them — that
+  # noise reads like a test failure in CI output.
+  for p in 49731 49732 49733; do /usr/bin/nc -l 127.0.0.1 "$p" >/dev/null 2>&1 & disown; done
+  sleep 0.5
+  out="$(loopback_status)"
+  pkill -f "nc -l 127.0.0.1 4973" >/dev/null 2>&1 || true
+  case "$out" in
+    ok*) ;;
+    *) die "loopback probe mis-reported busy probe ports as a firewall block (got: $out)" ;;
+  esac
+
+  # Probe cannot confirm a listener → must be inconclusive, never BLOCKED.
+  printf '#!/bin/bash\nexit 1\n' > "$shim/lsof"; chmod +x "$shim/lsof"
+  out="$(PATH="$shim:$PATH"; eval "$(sed -n '/^loopback_status()/,/^}/p' "$ROOT/qsys-mac" | sed 's|/usr/sbin/lsof|lsof|')"; loopback_status)"
+  case "$out" in
+    inconclusive*) ;;
+    *) die "loopback probe should be inconclusive when no listener can be confirmed (got: $out)" ;;
+  esac
+)
+say "  ok: probe reports ok/inconclusive correctly and never false-blocks"
+
 say "checking process cleanup harness"
 "$ROOT/scripts/test-process-cleanup.sh"
 

@@ -175,6 +175,47 @@ rosetta_status() {
   if /usr/bin/arch -x86_64 /usr/bin/true >/dev/null 2>&1; then printf 'installed'; else printf 'missing'; fi
 }
 
+# Can this machine actually use TCP loopback? Designer's web panes (Monaco script editor,
+# help, splash) are CEF talking to the embedded server over 127.0.0.1 — if a filter blocks
+# loopback, those panes render BLANK with no error anywhere, which is the single most
+# confusing failure this wrapper produces. Probe the real capability (bind a listener on an
+# ephemeral-range port, then connect to it) instead of inferring from an installed app, so
+# this also catches LuLu, Radio Silence, pf rules, and MDM-pushed firewalls — not just
+# Little Snitch. Uses nc (ships with macOS); deliberately no python3 (the native-helper work
+# removed that runtime dependency and this must not reintroduce it).
+#
+# CAVEAT, and it is the important one: these filters are PER-PROCESS. A pass here proves only
+# that *this helper* may use loopback — Designer is a different binary and can still be
+# blocked independently. So `ok` is not a guarantee, while `blocked` is a definite finding.
+loopback_status() {
+  local port listener_pid had_listener=0
+  for port in 49731 49732 49733; do
+    /usr/bin/nc -l 127.0.0.1 "$port" >/dev/null 2>&1 &
+    listener_pid=$!
+    sleep 0.3
+    # Confirm the port is genuinely in LISTEN before drawing any conclusion. `nc -l` LINGERS
+    # instead of exiting when the port is already taken (verified on macOS 26), so
+    # process-is-alive is NOT a bind test — trusting it would let a failed connect on an
+    # unbound port masquerade as a firewall block.
+    if /usr/sbin/lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+      had_listener=1
+      if /usr/bin/nc -z -G 2 127.0.0.1 "$port" >/dev/null 2>&1; then
+        kill "$listener_pid" 2>/dev/null; wait "$listener_pid" 2>/dev/null
+        printf 'ok (this process — per-app rules still apply to Designer)'
+        return 0
+      fi
+    fi
+    kill "$listener_pid" 2>/dev/null; wait "$listener_pid" 2>/dev/null
+  done
+  # Only claim "blocked" when something was demonstrably listening and the connect still
+  # failed — otherwise we'd send someone hunting a firewall problem they don't have.
+  if [ "$had_listener" -eq 1 ]; then
+    printf 'BLOCKED — Designer web panes will be blank; allow 127.0.0.1 in your firewall'
+  else
+    printf 'inconclusive (could not open a probe listener)'
+  fi
+}
+
 first_glob() {
   local found
   while IFS= read -r found; do
@@ -210,6 +251,7 @@ cmd_doctor() {
   printf '  %-22s : %s\n' 'macOS' "$(sw_vers -productVersion 2>/dev/null || printf 'unknown')"
   printf '  %-22s : %s\n' 'architecture' "$(uname -m)"
   printf '  %-22s : %s\n' 'Rosetta 2' "$(rosetta_status)"
+  printf '  %-22s : %s\n' 'TCP loopback' "$(loopback_status)"
 
   printf '\nInstaller resources\n'
   printf '  %-22s : %s\n' 'Resources dir' "$RES"
