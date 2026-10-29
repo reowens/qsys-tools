@@ -4,7 +4,7 @@
 # recipe.sh — shared library for the Q-SYS Designer macOS BYO wrapper.
 #
 # This file contains ZERO QSC bytes. It is a recipe: it knows how to drive a
-# free Wine build, install the .NET 8 runtime, extract the user's OWN downloaded
+# free Wine build, install the matching .NET runtime, extract the user's OWN downloaded
 # Q-SYS Designer installer, and assemble the extracted files into a working
 # Wine prefix. The user supplies their own free download; nothing here ships it.
 #
@@ -36,19 +36,50 @@ RECIPE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Pinned free dependencies. URLs rot — see README "When a download 404s".
 : "${WINE_URL:=https://github.com/Gcenx/macOS_Wine_builds/releases/download/11.10/wine-staging-11.10-osx64.tar.xz}"
-: "${DOTNET_DESKTOP_URL:=https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/8.0.28/windowsdesktop-runtime-8.0.28-win-x64.exe}"
-: "${DOTNET_ASPNET_URL:=https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/8.0.28/aspnetcore-runtime-8.0.28-win-x64.exe}"
+: "${DOTNET_10_DESKTOP_URL:=https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/10.0.14/windowsdesktop-runtime-10.0.14-win-x64.exe}"
+: "${DOTNET_10_ASPNET_URL:=https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.14/aspnetcore-runtime-10.0.14-win-x64.exe}"
+: "${DOTNET_8_DESKTOP_URL:=https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/8.0.33/windowsdesktop-runtime-8.0.33-win-x64.exe}"
+: "${DOTNET_8_ASPNET_URL:=https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/8.0.33/aspnetcore-runtime-8.0.33-win-x64.exe}"
 : "${DOTNET_INSTALL_TIMEOUT_SECONDS:=900}"
 
 # SHA-256 of each pinned artifact — checked before we ever extract/run it, on a fresh
 # download AND on the bundled cache (a tampered or swapped cache is rejected too). The two
-# .NET hashes are cross-checked against Microsoft's published release metadata
-# (dotnet/release-metadata/8.0/releases.json, 8.0.28). Gcenx ships no checksum, so Wine is
+# .NET profiles are cross-checked against Microsoft's published 8.0/10.0 release
+# metadata. Gcenx ships no checksum, so Wine is
 # pinned to the audited build that passed provisioning + notarization. Bump these whenever
 # the URLs above change version.
 : "${WINE_SHA256:=940bdd1a177872020be01c5c33917cb8eecc1cc3193ad554914fb6efd90d7889}"
-: "${DOTNET_DESKTOP_SHA256:=8819b8680a7a7668097bb031a856a5469159c8d6a8cfb2a6b2c0be44e74cb0c1}"
-: "${DOTNET_ASPNET_SHA256:=f2b7bd56946ca20061241c0f4ab1e869dbd69b3cf4dd280650d7ea1d46a0b605}"
+: "${DOTNET_10_DESKTOP_SHA256:=91c2795a7b1e2480caa83fce9514dc2e2d21e277d9a297311faba6040bad7330}"
+: "${DOTNET_10_ASPNET_SHA256:=b7ff2dc29209ac243eaea0b7614e26d33136e3d8a1aba97ba211e0e39e209849}"
+: "${DOTNET_8_DESKTOP_SHA256:=4de14de0b327e801d7a691cb1afc8a00db5313a698ef53b979fc6f84fce631de}"
+: "${DOTNET_8_ASPNET_SHA256:=19448b01f8bd96a5df33e4a9b267707b2defd85e44a50f8851596af1b9a6ecea}"
+# Retain explicit legacy URL/hash overrides; normal selection follows the app's
+# runtimeconfig after MSI assembly, so 10.4/.NET 8 remains supported.
+DOTNET_CUSTOM_DESKTOP_URL="${DOTNET_DESKTOP_URL:-}"
+DOTNET_CUSTOM_ASPNET_URL="${DOTNET_ASPNET_URL:-}"
+DOTNET_CUSTOM_DESKTOP_SHA256="${DOTNET_DESKTOP_SHA256:-}"
+DOTNET_CUSTOM_ASPNET_SHA256="${DOTNET_ASPNET_SHA256:-}"
+
+set_dotnet_profile() {
+  case "$1" in
+    8)
+      DOTNET_VERSION=8.0.33
+      DOTNET_DESKTOP_URL="${DOTNET_CUSTOM_DESKTOP_URL:-$DOTNET_8_DESKTOP_URL}"
+      DOTNET_ASPNET_URL="${DOTNET_CUSTOM_ASPNET_URL:-$DOTNET_8_ASPNET_URL}"
+      DOTNET_DESKTOP_SHA256="${DOTNET_CUSTOM_DESKTOP_SHA256:-$DOTNET_8_DESKTOP_SHA256}"
+      DOTNET_ASPNET_SHA256="${DOTNET_CUSTOM_ASPNET_SHA256:-$DOTNET_8_ASPNET_SHA256}"
+      ;;
+    10)
+      DOTNET_VERSION=10.0.14
+      DOTNET_DESKTOP_URL="${DOTNET_CUSTOM_DESKTOP_URL:-$DOTNET_10_DESKTOP_URL}"
+      DOTNET_ASPNET_URL="${DOTNET_CUSTOM_ASPNET_URL:-$DOTNET_10_ASPNET_URL}"
+      DOTNET_DESKTOP_SHA256="${DOTNET_CUSTOM_DESKTOP_SHA256:-$DOTNET_10_DESKTOP_SHA256}"
+      DOTNET_ASPNET_SHA256="${DOTNET_CUSTOM_ASPNET_SHA256:-$DOTNET_10_ASPNET_SHA256}"
+      ;;
+    *) die "Unsupported .NET runtime major: $1" ;;
+  esac
+}
+set_dotnet_profile 10
 
 : "${CACHE:=$WRAP_HOME/cache}"                  # bundled (Tier B) deps live here; override to the app's Resources/cache
 WINEDIR="$WINE_APP/Contents/Resources/wine"
@@ -315,19 +346,34 @@ init_prefix() {
   return 0
 }
 
+select_dotnet_for_app() {
+  local config="$WINEPREFIX/drive_c/$APP_SUBDIR/Q-Sys Designer.runtimeconfig.json" tfm major
+  [ -f "$config" ] || die "Assemble Designer before selecting its .NET runtime."
+  tfm="$(/usr/bin/plutil -extract runtimeOptions.tfm raw -o - "$config")" \
+    || die "Cannot read Designer's runtimeconfig."
+  case "$tfm" in
+    net8.*) major=8 ;;
+    net10.*) major=10 ;;
+    *) die "Designer requires unsupported runtime '$tfm'." ;;
+  esac
+  set_dotnet_profile "$major"
+}
+
 install_dotnet() {
+  select_dotnet_for_app
   local desktop="$CACHE/$(basename "$DOTNET_DESKTOP_URL")"
   local aspnet="$CACHE/$(basename "$DOTNET_ASPNET_URL")"
   mkdir -p "$CACHE"
-  [ -f "$desktop" ] || { say "Downloading .NET 8 Desktop runtime…"; curl -fL --progress-bar -o "$desktop" "$DOTNET_DESKTOP_URL" || die ".NET Desktop download failed."; }
-  [ -f "$aspnet"  ] || { say "Downloading ASP.NET Core 8 runtime…"; curl -fL --progress-bar -o "$aspnet"  "$DOTNET_ASPNET_URL"  || die "ASP.NET Core download failed."; }
-  verify_sha256 "$desktop" "$DOTNET_DESKTOP_SHA256" "the .NET 8 Desktop runtime"
-  verify_sha256 "$aspnet"  "$DOTNET_ASPNET_SHA256"  "the ASP.NET Core 8 runtime"
+  say "Selecting Windows x64 .NET runtime $DOTNET_VERSION for this Designer version."
+  [ -f "$desktop" ] || { say "Downloading .NET Desktop runtime…"; curl -fL --progress-bar -o "$desktop" "$DOTNET_DESKTOP_URL" || die ".NET Desktop download failed."; }
+  [ -f "$aspnet"  ] || { say "Downloading ASP.NET Core runtime…"; curl -fL --progress-bar -o "$aspnet"  "$DOTNET_ASPNET_URL"  || die "ASP.NET Core download failed."; }
+  verify_sha256 "$desktop" "$DOTNET_DESKTOP_SHA256" "the .NET Desktop runtime"
+  verify_sha256 "$aspnet"  "$DOTNET_ASPNET_SHA256"  "the ASP.NET Core runtime"
   # During the *install* only, disable mscoree+mshtml to skip the wine-mono prompt.
   # (At LAUNCH mscoree must be ON — disabling it breaks the managed loader. See README.)
-  say "Installing .NET 8 Desktop runtime (silent)…"
+  say "Installing .NET $DOTNET_VERSION Desktop runtime (silent)…"
   run_dotnet_installer "Desktop" "$desktop" || warn "Desktop runtime installer returned nonzero."
-  say "Installing ASP.NET Core 8 runtime (silent)…"
+  say "Installing ASP.NET Core $DOTNET_VERSION runtime (silent)…"
   run_dotnet_installer "ASP.NET" "$aspnet" || warn "ASP.NET runtime installer returned nonzero."
   # Both installers exit nonzero under Wine even on success, so their exit code can't gate this —
   # assert the runtime actually LANDED. The .NET installer must create a window; a headless run with
@@ -336,7 +382,14 @@ install_dotnet() {
   # that still reports "provisioned". Fail loudly here instead of shipping a silently-broken prefix.
   local dotnet_dir="$WINEPREFIX/drive_c/Program Files/dotnet"
   [ -f "$dotnet_dir/dotnet.exe" ] && [ -d "$dotnet_dir/shared/Microsoft.WindowsDesktop.App" ] \
-    || die ".NET 8 runtime did not install (missing dotnet.exe / Microsoft.WindowsDesktop.App under \"$dotnet_dir\"). The .NET installer needs a GUI session to create its window — a headless SSH-only run can't reach the macOS Aqua session. Provision from the desktop, or from a Terminal inside a logged-in GUI session."
+    || die ".NET runtime did not install under \"$dotnet_dir\". Provision from an accessible desktop session."
+  local installed framework
+  installed="$("$WINE" "$dotnet_dir/dotnet.exe" --list-runtimes 2>/dev/null)" \
+    || die "The installed Windows .NET runtime could not start."
+  for framework in Microsoft.NETCore.App Microsoft.WindowsDesktop.App Microsoft.AspNetCore.App; do
+    printf '%s\n' "$installed" | grep -F "$framework $DOTNET_VERSION " >/dev/null \
+      || die "Missing required runtime: $framework $DOTNET_VERSION"
+  done
 }
 
 # ----------------------------------------------------------------------------

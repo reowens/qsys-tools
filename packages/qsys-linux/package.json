@@ -1,0 +1,21 @@
+{
+  "name": "qsys-linux",
+  "version": "0.1.0",
+  "description": "Per-user Q-SYS Designer installer and launcher for Ubuntu Linux, using Wine and your own QSC installer.",
+  "type": "module",
+  "bin": { "qsys-linux": "bin/qsys-linux.mjs" },
+  "main": "lib/launcher.mjs",
+  "exports": "./lib/launcher.mjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepack": "npm run build",
+    "test": "node --test test/*.test.mjs && python3 -m unittest discover -s test -v"
+  },
+  "files": ["bin", "lib/launcher.mjs", "lib/qsys_linux.py", "lib/support", "README.md", "CHANGELOG.md", "LICENSE"],
+  "engines": { "node": ">=22.13" },
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/reowens/qsys-tools.git", "directory": "packages/qsys-linux" },
+  "bugs": { "url": "https://github.com/reowens/qsys-tools/issues" },
+  "homepage": "https://github.com/reowens/qsys-tools/tree/main/packages/qsys-linux#readme",
+  "keywords": ["q-sys", "qsys", "qsc", "linux", "ubuntu", "wine", "installer", "av"]
+}

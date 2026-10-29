@@ -77,7 +77,7 @@ enum DataDir {
         env["WINEPREFIX"] = prefix
         env["WINELOADER"] = wine
         env["WINEDEBUG"] = "fixme-all,err-all"
-        env["DOTNET_EnableWriteXorExecute"] = "0"   // Rosetta 2 W^X compat for the .NET 8 JIT
+        env["DOTNET_EnableWriteXorExecute"] = "0"   // Rosetta 2 W^X compat for the Windows .NET JIT
         env["LIBGL_ALWAYS_SOFTWARE"] = "1"           // WPF software render (else black window)
         env["WINEDLLOVERRIDES"] = "mshtml=d;mountmgr.sys=d" // mscoree ON — off breaks the managed loader; mountmgr.sys=d stops the /Volumes raw-device scan (parity with launch.sh + emit_app)
         env["QSYS_MENU_NAME"] = "Q-SYS Designer"

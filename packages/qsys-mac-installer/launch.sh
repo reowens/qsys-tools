@@ -21,7 +21,7 @@ say "launching: $EXE"
 #   …;mountmgr.sys=d                 -> kill the DiskArbitration /Volumes scan whose raw-device
 #                                       open() trips the macOS removable-volume TCC prompt; C:/Z:
 #                                       still resolve via static dosdevices symlinks (no mountmgr)
-#   DOTNET_EnableWriteXorExecute=0   -> Rosetta 2 W^X compat for the .NET 8 JIT
+#   DOTNET_EnableWriteXorExecute=0   -> Rosetta 2 W^X compat for the Windows .NET JIT
 #   LIBGL_ALWAYS_SOFTWARE=1 + reg key -> WPF software render (else black window)
 #   NO CEF flags                     -> CefSharp adds --no-sandbox itself; a leading
 #                                       flag poisons Designer's argv[0] design-loader.

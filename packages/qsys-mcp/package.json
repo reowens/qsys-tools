@@ -1,8 +1,8 @@
 {
   "name": "qsys-mcp",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "mcpName": "io.github.reowens/qsys-mcp",
-  "description": "Control a Q-SYS audio/video system from an AI agent over QSC's QRC protocol — against a real Core or Q-SYS Designer in Emulate mode. Open-source, cross-platform, zero QSC code.",
+  "description": "Control a Q-SYS audio/video system from an AI agent over QSC's QRC protocol \u2014 against a real Core or Q-SYS Designer in Emulate mode. Open-source, cross-platform, zero QSC code.",
   "type": "module",
   "bin": {
     "qsys-mcp": "dist/index.js"
@@ -58,14 +58,14 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.18.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "qsys-qrc": "workspace:^",
-    "zod": "^3.23.8"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/node": "^22.5.0",
+    "@types/node": "^22.20.5",
     "qsys-mock-core": "workspace:^",
-    "tsx": "^4.23.0",
-    "typescript": "^5.6.0"
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
   }
 }

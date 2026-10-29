@@ -20,6 +20,7 @@ on:
       - 'qsys-cli-v*'
       - 'qsys-mcp-v*'
       - 'qsys-mac-v*'
+      - 'qsys-linux-v*'
 
 permissions:
   contents: read
@@ -30,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: npm-publish # protection rules (required reviewers) are configured in repo settings
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # full history so the main-ancestry gate can run
 
@@ -49,6 +50,7 @@ jobs:
             qsys-cli) dir=packages/qsys ;;
             qsys-mcp) dir=packages/qsys-mcp ;;
             qsys-mac) dir=packages/qsys-mac ;;
+            qsys-linux) dir=packages/qsys-linux ;;
             *) echo "::error::unrecognized package in tag '$tag'"; exit 1 ;;
           esac
           if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
@@ -66,9 +68,9 @@ jobs:
 
       # pnpm does the workspace build + pack (it rewrites the `workspace:^` protocol
       # to a real version); npm does the OIDC publish.
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24 # ships npm >= 11.5.1 (with sigstore) — required for trusted publishing + provenance
           registry-url: 'https://registry.npmjs.org'
@@ -109,6 +111,9 @@ jobs:
           node -e "require.resolve('$name')"
           if [ "$name" = "qsys-qrc" ]; then
             node -e "const m = require('qsys-qrc'); if (typeof m.QrcClient !== 'function') throw new Error('QrcClient export missing')"
+          fi
+          if [ "$name" = "qsys-linux" ]; then
+            node node_modules/qsys-linux/bin/qsys-linux.mjs --help
           fi
           echo "out=$out" >> "$GITHUB_OUTPUT"
 

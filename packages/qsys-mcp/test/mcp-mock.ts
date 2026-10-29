@@ -55,10 +55,19 @@ async function main(): Promise<void> {
   };
 
   // Tool registration
-  const tools = (await client.listTools()).tools.map((t) => t.name).sort();
+  const registered = (await client.listTools()).tools;
+  const tools = registered.map((t) => t.name).sort();
   assert.deepEqual(tools, EXPECTED_TOOLS, `registered tools should be exactly the ${EXPECTED_TOOLS.length} expected`);
 
-  await call('qsys_connect', { host: '127.0.0.1', port: mock.port });
+  // Schema conversion must preserve defaults and optional inputs across SDK/Zod upgrades.
+  const connectSchema = registered.find((t) => t.name === 'qsys_connect')!.inputSchema;
+  assert.deepEqual(connectSchema.required ?? [], [], 'connect defaults are optional to MCP clients');
+  for (const [key, value] of Object.entries({ host: '127.0.0.1', port: 1710, reconnect: true, allow_live_writes: false })) {
+    assert.equal((connectSchema.properties![key] as { default?: unknown }).default, value, `${key} default is advertised`);
+  }
+
+  // Omit host so the actual handler must receive the schema's localhost default.
+  await call('qsys_connect', { port: mock.port });
 
   // Response shaping — qsys_list_components
   const all = json(await call('qsys_list_components'));

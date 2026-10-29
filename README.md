@@ -22,6 +22,7 @@ code, no SDK, no hardware required for development.**
 | [`qsys-mcp`](packages/qsys-mcp) | [MCP](https://modelcontextprotocol.io) server (`io.github.reowens/qsys-mcp` in the MCP Registry) — 18 tools that let an AI agent inspect and drive a live Q-SYS system |
 | [`qsys-mac`](packages/qsys-mac) | npm bootstrapper (command: `qsys-mac`) — downloads/verifies the signed Q-SYS Mac Installer DMG and delegates to its helper |
 | [`qsys-mac-installer`](packages/qsys-mac-installer) | **Q-SYS Designer for macOS** — signed/notarized BYO-installer wrapper app + DMG source |
+| [`qsys-linux`](packages/qsys-linux) | **Q-SYS Designer for Ubuntu 26.04 x86-64** — per-user Wine/.NET 10 setup and desktop launcher; npm package prepared for first publication |
 
 ## Quick start — shell
 
@@ -150,6 +151,21 @@ The current signed DMG is
 Bonus: Designer's **Emulate mode** serves QRC on `127.0.0.1:1710`, so all of the
 tools above work hardware-free against it — that's how this repo's tooling is
 validated.
+
+## Q-SYS Designer on Linux
+
+The initial Linux recipe runs Designer **10.5.1** on **Ubuntu 26.04 x86-64**
+through Wine Staging 11.20 and Windows .NET 10. Supply your own vendor ZIP/EXE:
+
+```sh
+packages/qsys-linux/qsys-linux install "/path/to/Q-SYS_Designer_Installer_10.5.1.zip"
+~/.local/bin/qsys-linux doctor
+~/.local/bin/qsys-linux launch
+```
+
+Installation needs an accessible X11/XWayland desktop and 12 GiB free during
+setup. It runs per-user without sudo and adds a **Q-SYS Designer** desktop
+launcher. See [requirements and validation](packages/qsys-linux/README.md).
 
 ## No hardware?
 
