@@ -108,13 +108,19 @@ patch fails on an unknown client layout and should be removed when npm ships
 this recovery itself.
 
 If an existing release tag contains the older workflow, retry from the repaired
-workflow on main without moving the tag:
+workflow without moving that public tag. The environment currently admits only
+`qsys-*-v*` tag refs, so create a separate recovery tag at the merged workflow
+commit and dispatch from it:
 
 ```sh
-gh workflow run publish.yml --ref main -f release_tag=qsys-mcp-v0.6.1
+git tag -a qsys-publish-recovery-v0.6.1 -m 'Publishing workflow recovery' origin/main
+git push origin qsys-publish-recovery-v0.6.1
+gh workflow run publish.yml --ref qsys-publish-recovery-v0.6.1 -f release_tag=qsys-mcp-v0.6.1
 ```
 
-The retry requires the tag and workflow commit to be on main and their source
+Recovery tags do not match the automatic npm publication triggers. Reuse an
+existing recovery tag if it already identifies the intended workflow commit.
+The retry requires the release tag and workflow commit to be on main and their source
 and build inputs to be identical. Only `publish.yml` and this release document
 may differ. Build, typecheck, tests, and packed-consumer checks still run. Verify
 whether the version is already on npm before retrying a failed run.
