@@ -16,11 +16,20 @@ provisions a Wine prefix, and emits a `Q-SYS Designer.app`.
 > [`reowens/qsys-tools`](https://github.com/reowens/qsys-tools) (`packages/qsys-mac-installer`),
 > licensed **MIT** (see [Legal & release](#legal--release)).
 
+The source recipe also supports **Designer 10.5.1 / .NET 10.0.14**, provisioned
+and launch-tested in isolation on an M2 Air / macOS 27 with Wine 11.10. It selects
+the runtime from the supplied Designer's metadata and retains .NET 8.0.33 for
+10.4.x installers. The currently published **0.1.8 DMG** still bundles the older
+.NET 8 recipe; use the source build for 10.5.1 until a new DMG is released.
+The Air check verified full MSI assembly, runtime startup, a Designer window,
+and CEF subprocess startup; interactive editor validation remains on the older
+Mac release and on the Linux 10.5.1 build.
+
 ---
 
 ## Why this exists
 
-Q-SYS Designer is a **.NET 8 (x64) WPF** app with an embedded **CefSharp/CEF** Chromium
+Q-SYS Designer is a **Windows .NET (x64) WPF** app with an embedded **CefSharp/CEF** Chromium
 pane. There is no native macOS build and no clean way to port one without QSC's source.
 The realistic path is a compatibility layer. This wrapper is the automation around that
 layer — the same model Wine/CrossOver/Whisky operate under: *a tool isn't a derivative
@@ -73,7 +82,7 @@ open -a "Q-SYS Mac Installer"
 Source recipe path:
 
 ```sh
-./build.sh --installer "/path/to/Q-SYS Designer Installer 10.4.0.exe"
+./build.sh --installer "/path/to/Q-SYS Designer Installer 10.5.1.exe"
 open -a "$HOME/Applications/Q-SYS Designer.app"
 ```
 
@@ -275,18 +284,20 @@ internals behind it would change.
 1. **Wine** — reuse an existing free build or download the pinned `wine-staging 11.10`
    (gcenx `macOS_Wine_builds`); ad-hoc codesign + de-quarantine.
 2. **Prefix** — `WINEARCH=win64 wineboot --init`.
-3. **.NET 8** — silent-install the **WindowsDesktop** *and* **ASP.NET Core** runtimes
-   (8.0.28). Both are required — Designer's `runtimeconfig` needs NETCore + WindowsDesktop
-   + AspNetCore.
-4. **Extract** your installer with `7z` (the InstallAware GUI bootstrapper deadlocks
+3. **Extract** your installer with `7z` (the InstallAware GUI bootstrapper deadlocks
    under Wine, so we bypass it and assemble from the MSI layout ourselves).
-5. **Assemble the complete app from the MSI layout.** InstallAware shatters the payload across
+4. **Assemble the complete app from the MSI layout.** InstallAware shatters the payload across
    opaque `OFFLINE/<hash>/<hash>` dirs whose names change every Designer build, and ships a
    metadata-only MSI alongside them. That MSI's `Directory`/`Component`/`File` tables encode, for
    every file, both its OFFLINE source and its install target (in `DefaultDir`'s `[target]:[source]`
    form), so the wrapper (`lib/assemble-msi.py`, via `msiinfo`) reconstructs the **whole** install
    tree — every component definition, plugin, symbol and DLL — instead of hand-picking a few dirs.
    The MSI is authoritative and self-consistent within each build, so this survives version bumps.
+5. **Matching .NET runtime** — read the assembled `runtimeconfig`, then install
+   WindowsDesktop and ASP.NET Core **10.0.14** for 10.5.x or **8.0.33** for 10.4.x.
+   Both installers are needed for NETCore + WindowsDesktop + AspNetCore. The
+   source packaging script caches both profiles and verifies their checksums;
+   provisioning verifies all three installed frameworks before marking success.
 6. **Prefix tweaks** — WPF software-render reg key; pre-create the prefs dir.
 7. **Emit a self-contained `Q-SYS Designer.app`** — Wine and the prefix are cloned
    *inside* the bundle (APFS clonefile → ~free on disk), and the launcher computes its
@@ -330,7 +341,7 @@ Every launch token is load-bearing — these were each a debugging session:
 | Token | Why |
 |---|---|
 | `WINEDLLOVERRIDES="mshtml=d"` | **mscoree ON.** Disabling it (e.g. `mscoree,mshtml=`) breaks the IL-only managed-assembly loader → fake CLR crash `0x80131506` before any UI. Only Gecko (`mshtml`) is disabled. The `mscoree,mshtml=` form is used **during .NET install only**, to skip the wine-mono prompt. |
-| `DOTNET_EnableWriteXorExecute=0` | Rosetta 2 W^X compatibility for the .NET 8 JIT. |
+| `DOTNET_EnableWriteXorExecute=0` | Rosetta 2 W^X compatibility for the Windows .NET JIT. |
 | `LIBGL_ALWAYS_SOFTWARE=1` + `Avalon.Graphics\DisableHWAcceleration=1` | WPF software render. Without it the main window is black (`GL_INVALID_FRAMEBUFFER_OPERATION` from `glBlitFramebuffer`). |
 | **no CEF command-line flags** | CefSharp adds `--no-sandbox` + ANGLE/SwiftShader to its own subprocesses programmatically. Passing them ourselves was redundant **and** broke startup: Designer's design-loader reads `argv[0]` as a design path, so a leading `--no-sandbox` got async-opened as a bogus "design" → an NRE dialog. Pass nothing. |
 | `wine-staging 11.x`, **not** GPTK `wine-7.7` | GPTK's old Wine clears the CLR but then stack-overflows during init (main-thread stack too small). |
@@ -369,7 +380,7 @@ The app bundles free, redistributable deps for Wine/.NET, `7z`, icon extraction,
 inspection, and native assembly/font helpers so first-run setup does not download those payloads or
 require host `python3`.
 Full table + license texts in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md), which is
-shipped inside the `.dmg`. In brief: **Wine** (LGPL-2.1), **.NET 8 runtimes** (Microsoft .NET
+shipped inside the `.dmg`. In brief: **Wine** (LGPL-2.1), **.NET runtimes** (Microsoft .NET
 Library License for the redistributable binaries; source MIT), **p7zip** (LGPL/GPL), **libpng**
 (zlib-style), **icoutils** (`wrestool`/`icotool`, **GPL-3.0**), and **msiinfo/msitools**
 (GPL/LGPL with GLib/libgsf/gettext/PCRE2 runtime libraries). GPL components are why the
@@ -409,7 +420,7 @@ WINE_APP="/path/to/Wine Staging.app" ./build.sh --installer ...   # reuse a loca
 # or set WINE_URL / DOTNET_DESKTOP_URL / DOTNET_ASPNET_URL to fresh links
 ```
 
-.NET 8 runtimes: <https://dotnet.microsoft.com/download/dotnet/8.0> (need **x64**,
+.NET runtimes: <https://dotnet.microsoft.com/download/dotnet> (need **Windows x64**,
 WindowsDesktop **and** ASP.NET Core).
 
 The silent .NET installers run under Wine and can occasionally stall before returning. The recipe

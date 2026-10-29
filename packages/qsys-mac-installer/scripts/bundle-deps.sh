@@ -42,8 +42,12 @@ fetch() {  # $1 = url  $2 = expected sha256
   verify_sha256 "$dst" "$want" "$name"
 }
 fetch "$WINE_URL"           "$WINE_SHA256"
-fetch "$DOTNET_DESKTOP_URL" "$DOTNET_DESKTOP_SHA256"
-fetch "$DOTNET_ASPNET_URL"  "$DOTNET_ASPNET_SHA256"
+for runtime_major in 8 10; do
+  set_dotnet_profile "$runtime_major"
+  fetch "$DOTNET_DESKTOP_URL" "$DOTNET_DESKTOP_SHA256"
+  fetch "$DOTNET_ASPNET_URL"  "$DOTNET_ASPNET_SHA256"
+done
+set_dotnet_profile 10
 
 # ----------------------------------------------------------------------------
 # 2. CLI tools the recipe shells out to. End-user machines have no Homebrew, so

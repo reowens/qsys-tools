@@ -56,9 +56,9 @@ mkdir -p "$WRAP_HOME"
 preflight
 ensure_wine
 init_prefix
-[ "$SKIP_DOTNET" -eq 1 ] && say "Skipping .NET install (--skip-dotnet)" || install_dotnet
 extract_installer "$INSTALLER"
 assemble
+[ "$SKIP_DOTNET" -eq 1 ] && say "Skipping .NET install (--skip-dotnet)" || install_dotnet
 apply_prefix_tweaks
 check_hosts
 stop_wine_for_prefix

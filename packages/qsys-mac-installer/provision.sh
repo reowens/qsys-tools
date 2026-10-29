@@ -103,15 +103,15 @@ ensure_wine            # extracts/uses the (bundled, Tier B) Wine into $WINE_APP
 emit_step "Initializing the Windows environment" prefix
 init_prefix
 
-emit_step "Installing the .NET runtime" dotnet
-install_dotnet         # uses the (bundled, Tier B) cached installers
-
 emit_step "Extracting your installer" extract
 extract_installer "$INSTALLER"
 
 emit_step "Assembling Q-SYS Designer" assemble
 assemble               # MSI-maps the complete app payload into the prefix's Designer dir
 cleanup_extract        # reclaim the ~1.6 GB installer-extract scratch (assemble was its last consumer)
+
+emit_step "Installing the matching .NET runtime" dotnet
+install_dotnet         # selects .NET 8/10 from the assembled runtimeconfig
 
 emit_step "Finishing up" finalize
 apply_prefix_tweaks

@@ -90,6 +90,33 @@ say "checking headless-SSH pre-flight probe"
 )
 say "  ok: probe fires only on SSH + unowned console, honors QSYS_ASSUME_GUI"
 
+say "checking runtime selection from Designer metadata"
+(
+  unset DOTNET_DESKTOP_URL DOTNET_ASPNET_URL DOTNET_DESKTOP_SHA256 DOTNET_ASPNET_SHA256
+  source "$ROOT/lib/recipe.sh"
+  fixture="$(mktemp -d)"
+  trap 'rm -rf "$fixture"' EXIT
+  WINEPREFIX="$fixture/prefix"
+  mkdir -p "$WINEPREFIX/drive_c/$APP_SUBDIR"
+  config="$WINEPREFIX/drive_c/$APP_SUBDIR/Q-Sys Designer.runtimeconfig.json"
+  for pair in 'net8.0-windows:8.0.33' 'net10.0-windows:10.0.14'; do
+    tfm="${pair%%:*}"; expected="${pair#*:}"
+    printf '{"runtimeOptions":{"tfm":"%s"}}\n' "$tfm" > "$config"
+    select_dotnet_for_app
+    [ "$DOTNET_VERSION" = "$expected" ] || die "wrong runtime selected for $tfm"
+    case "$DOTNET_DESKTOP_URL $DOTNET_ASPNET_URL" in
+      *"/$expected/windowsdesktop-runtime-$expected-win-x64.exe "*"/$expected/aspnetcore-runtime-$expected-win-x64.exe") ;;
+      *) die "runtime URLs do not match $expected" ;;
+    esac
+    [ "${#DOTNET_DESKTOP_SHA256}" = 64 ] && [ "${#DOTNET_ASPNET_SHA256}" = 64 ] || die "runtime checksum missing"
+  done
+  printf '{"runtimeOptions":{"tfm":"net99.0"}}\n' > "$config"
+  if (select_dotnet_for_app) > /dev/null 2>&1; then die "unknown runtime accepted"; fi
+  rm "$config"
+  if (select_dotnet_for_app) > /dev/null 2>&1; then die "missing runtimeconfig accepted"; fi
+)
+say "  ok: .NET 8/10 follow the supplied app, unsupported/missing metadata is rejected"
+
 say "checking loopback probe (qsys-mac doctor)"
 # loopback_status() must never cry wolf: "BLOCKED" is only legitimate when a listener was
 # demonstrably in LISTEN and the connect still failed. Two traps this guards against —

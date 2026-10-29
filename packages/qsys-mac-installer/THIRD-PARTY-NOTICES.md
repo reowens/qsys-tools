@@ -12,8 +12,8 @@ redistributed here.
 | Component | Version | Role in the installer | License |
 |-----------|---------|-----------------|---------|
 | **Wine** (gcenx `wine-staging` build) | 11.10 | the Windows compatibility layer Designer runs on | LGPL-2.1-or-later |
-| **.NET Desktop Runtime** (Microsoft) | 8.0.28 | Designer is a .NET 8 WPF app | MS .NET Library License (redistributable binaries); source MIT |
-| **ASP.NET Core Runtime** (Microsoft) | 8.0.28 | required by Designer's `runtimeconfig` | MS .NET Library License (redistributable binaries); source MIT |
+| **.NET Desktop Runtime** (Microsoft) | 10.0.14 / 8.0.33 | Designer is a Windows .NET WPF app | MS .NET Library License (redistributable binaries); source MIT |
+| **ASP.NET Core Runtime** (Microsoft) | 10.0.14 / 8.0.33 | required by Designer's `runtimeconfig` | MS .NET Library License (redistributable binaries); source MIT |
 | **p7zip** (`7z`) | 17.06 | unpacks your Q-SYS Designer download | LGPL-2.1-or-later / GPL |
 | **libpng** (`libpng16`) | bundled | icon extraction dependency of icoutils | PNG Reference Library License (zlib-style) |
 | **icoutils** (`wrestool`, `icotool`) | 0.32.3 | extracts Designer's app icon from the download | **GPL-3.0-or-later** |
@@ -61,12 +61,12 @@ All bundled binaries are built from unmodified upstream source:
 - **GNU libintl / gettext runtime** (1.0, LGPL-2.1-or-later for libintl) —
   <https://www.gnu.org/software/gettext/>.
 - **PCRE2** (10.47, BSD-3-Clause WITH PCRE2-exception) — <https://www.pcre.org/>.
-- **.NET Desktop & ASP.NET Core Runtimes 8.0.28** — the `dotnet/runtime` *source* is MIT
+- **.NET Desktop & ASP.NET Core Runtimes 10.0.14 / 8.0.33** — the `dotnet/runtime` *source* is MIT
   (<https://github.com/dotnet/runtime>, <https://github.com/dotnet/runtime/blob/main/LICENSE.TXT>),
   but the official Microsoft runtime *binaries / installers* bundled here are redistributed under
   Microsoft's **.NET Library License**, whose text ships as `LICENSE.TXT` inside each runtime
   installer and grants a royalty-free right to redistribute the unmodified runtime with an
-  application. Installers from <https://dotnet.microsoft.com/download/dotnet/8.0>.
+  application. Installers from <https://dotnet.microsoft.com/download/dotnet>.
 - **Selawik** (1.01, SIL OFL 1.1, Reserved Font Name "Selawik") — Microsoft's Segoe-metric-
   compatible font, <https://github.com/microsoft/Selawik>. Redistributed **unmodified** in
   `assets/fonts/selawik/` with its `LICENSE.txt`. At provision time the recipe derives a
