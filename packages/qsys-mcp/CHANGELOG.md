@@ -6,6 +6,14 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-29
+
+### Changed
+
+- Upgrade the MCP SDK to ^1.32.2 and Zod to ^4.6.7, with refreshed transitive
+  dependencies to address dependency audit advisories. Tool inputs and defaults
+  remain unchanged.
+
 ## [0.6.0] - 2026-07-10
 
 ### Changed
