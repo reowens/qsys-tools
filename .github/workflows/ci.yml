@@ -54,6 +54,12 @@ jobs:
       # push with no hardware and no private dependency.
       - run: pnpm test
 
+      # The npm consumer/recipe tests run in pnpm test above; the direct source
+      # entry point also needs to remain valid POSIX shell.
+      - name: Linux source launcher syntax
+        if: matrix.os == 'ubuntu-latest'
+        run: sh -n packages/qsys-linux/qsys-linux
+
       # macOS-only installer smoke test: shell-syntax across the 9 installer scripts,
       # WINEDLLOVERRIDES launch-path parity (dev / generated .app / installed GUI), the
       # MSI path-containment fixtures, and the Wine process-cleanup harness (which stubs

@@ -20,6 +20,7 @@ on:
       - 'qsys-cli-v*'
       - 'qsys-mcp-v*'
       - 'qsys-mac-v*'
+      - 'qsys-linux-v*'
 
 permissions:
   contents: read
@@ -49,6 +50,7 @@ jobs:
             qsys-cli) dir=packages/qsys ;;
             qsys-mcp) dir=packages/qsys-mcp ;;
             qsys-mac) dir=packages/qsys-mac ;;
+            qsys-linux) dir=packages/qsys-linux ;;
             *) echo "::error::unrecognized package in tag '$tag'"; exit 1 ;;
           esac
           if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
@@ -109,6 +111,9 @@ jobs:
           node -e "require.resolve('$name')"
           if [ "$name" = "qsys-qrc" ]; then
             node -e "const m = require('qsys-qrc'); if (typeof m.QrcClient !== 'function') throw new Error('QrcClient export missing')"
+          fi
+          if [ "$name" = "qsys-linux" ]; then
+            node node_modules/qsys-linux/bin/qsys-linux.mjs --help
           fi
           echo "out=$out" >> "$GITHUB_OUTPUT"
 

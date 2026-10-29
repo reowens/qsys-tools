@@ -9,6 +9,7 @@ package-scoped.
 - `qsys-cli-vX.Y.Z` for `packages/qsys`
 - `qsys-mcp-vX.Y.Z` for `packages/qsys-mcp`
 - `qsys-mac-vX.Y.Z` for the npm bootstrapper in `packages/qsys-mac`
+- `qsys-linux-vX.Y.Z` for the Linux recipe/launcher in `packages/qsys-linux`
 - `qsys-mac-installer-vX.Y.Z` for the signed DMG from `packages/qsys-mac-installer`
 
 Use release titles without the `v` prefix, for example `qsys-mcp 0.3.2`.
@@ -45,6 +46,13 @@ gate publishes nothing:
 `qsys-tools`, workflow filename `publish.yml`. (Optionally set the package's publishing
 access to "Require two-factor authentication and disallow tokens" — OIDC still works.)
 `qsys-mock-core` is `private` and is never published.
+
+`qsys-linux` is prepared at 0.1.0. Before its first tag-driven publication,
+create the npm package under the owner account and configure its trusted
+publisher for this repository and `publish.yml`. Its packed consumer test
+checks that the Python recipe, public MSI/font helpers, and OFL fonts are
+self-contained. The package contains no QSC installer, Wine, or .NET binaries;
+installing the npm package does not provision Designer automatically.
 
 To release a package, push its per-package tag — the workflow packs it with pnpm
 (which rewrites `workspace:^` → a real range) and publishes the tarball with OIDC +

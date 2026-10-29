@@ -28,6 +28,8 @@ importers:
         specifier: workspace:^
         version: link:../qsys-mock-core
 
+  packages/qsys-linux: {}
+
   packages/qsys-mac: {}
 
   packages/qsys-mcp:
