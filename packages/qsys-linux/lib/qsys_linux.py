@@ -584,7 +584,6 @@ def scale_percent(value):
 
 def remove(args):
     root = args.data_dir
-    manifest(root)
     with owned_lock(root):
         launcher, desktop = integration_paths()
         if launcher.exists() and shlex.quote(str(root / 'libexec/qsys_linux.py')) in launcher.read_text():

@@ -212,6 +212,14 @@ class RecipeTests(unittest.TestCase):
         self.assertEqual(launcher.resolve(), npm_bin)
         self.assertEqual(Path(installed), target / 'bin/qsys-linux')
 
+    def test_remove_can_clean_an_owned_partial_install(self):
+        target = self.root / 'managed'
+        with recipe.owned_lock(target, create=True):
+            (target / 'install.log').write_text('failed before prefix handoff')
+        with patch.object(recipe, 'integration_paths', return_value=(self.root / 'bin', self.root / 'desktop')):
+            recipe.remove(argparse.Namespace(data_dir=target, purge=True))
+        self.assertFalse(target.exists())
+
     def test_installed_launcher_handles_spaces_and_shell_metacharacters(self):
         target = self.root / 'installed spaces $dollar;single\'quote'
         target.mkdir()
