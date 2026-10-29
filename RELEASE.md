@@ -54,6 +54,13 @@ checks that the Python recipe, public MSI/font helpers, and OFL fonts are
 self-contained. The package contains no QSC installer, Wine, or .NET binaries;
 installing the npm package does not provision Designer automatically.
 
+Before npm publication, a source preview may use the separate tag
+`qsys-linux-source-v0.1.0`, with a tested `qsys-linux-0.1.0.tgz` attached to its
+GitHub prerelease. The `qsys-linux-source-v*` tags do **not** trigger npm
+publishing. Build the tarball from that merged/tagged commit with
+`pnpm --filter qsys-linux pack`; inspect its contents and record its SHA-256
+in the release notes. Reserve `qsys-linux-v*` for actual npm releases.
+
 To release a package, push its per-package tag — the workflow packs it with pnpm
 (which rewrites `workspace:^` → a real range) and publishes the tarball with OIDC +
 provenance:

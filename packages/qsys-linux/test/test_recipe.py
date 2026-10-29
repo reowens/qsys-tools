@@ -209,7 +209,7 @@ class RecipeTests(unittest.TestCase):
         with patch.object(recipe, 'integration_paths', return_value=(launcher, desktop)):
             installed, _ = recipe.integration(target, support, fonts)
         self.assertTrue(launcher.is_symlink())
-        self.assertEqual(launcher.resolve(), npm_bin)
+        self.assertEqual(launcher.resolve(), npm_bin.resolve())
         self.assertEqual(Path(installed), target / 'bin/qsys-linux')
 
     def test_remove_can_clean_an_owned_partial_install(self):
