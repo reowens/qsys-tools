@@ -14,6 +14,12 @@ name: Publish to npm
 # Actions are pinned to reviewed commit SHAs; the `npm-publish` environment lets repo
 # Settings → Environments add required-reviewer approval in front of the publish.
 on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing package tag to retry; only release workflow/docs may differ from that tag'
+        required: true
+        type: string
   push:
     tags:
       - 'qsys-qrc-v*'
@@ -37,12 +43,14 @@ jobs:
 
       - name: Validate tag against package manifest and main
         id: pkg
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
         # qsys-qrc-v0.2.1 -> name=qsys-qrc, version=0.2.1 (dir packages/qsys-qrc;
         # qsys-cli lives in packages/qsys). The tag version must EQUAL the package.json
         # version, and the tagged commit must already be merged to main.
         run: |
           set -euo pipefail
-          tag="$GITHUB_REF_NAME"
+          tag="$RELEASE_TAG"
           name="${tag%-v*}"
           version="${tag##*-v}"
           case "$name" in
@@ -61,8 +69,15 @@ jobs:
             echo "::error::tag version '$version' != $dir/package.json version '$manifest'"; exit 1
           fi
           git fetch --quiet origin main
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "::error::tagged commit $GITHUB_SHA is not on origin/main — release only merged commits"; exit 1
+          tagged="$(git rev-parse --verify "refs/tags/$tag^{commit}")"
+          if ! git merge-base --is-ancestor "$tagged" origin/main || ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::both the release tag and publishing workflow must be on origin/main"; exit 1
+          fi
+          # A manual retry uses the repaired workflow on main, without rewriting
+          # a public tag. Require identical source/build inputs; only this workflow
+          # and the release instructions may have changed since the tagged commit.
+          if ! git diff --exit-code "$tagged" HEAD -- . ':!.github/workflows/publish.yml' ':!RELEASE.md'; then
+            echo "::error::source/build inputs differ from the release tag — create a new release instead"; exit 1
           fi
           echo "name=$name" >> "$GITHUB_OUTPUT"
 
@@ -116,6 +131,32 @@ jobs:
             node node_modules/qsys-linux/bin/qsys-linux.mjs --help
           fi
           echo "out=$out" >> "$GITHUB_OUTPUT"
+
+      # npm/cli#10078: Rekor may commit an entry before a client retry gets 409.
+      # Enable Sigstore's existing fetch-and-verify recovery rather than dropping
+      # provenance. Upstream fix: sigstore/sigstore-js#1709. This changes only the
+      # disposable runner's npm client, with a guard against unknown layouts.
+      - name: Enable Sigstore duplicate-entry recovery
+        run: |
+          QSYS_NPM_CLI="$(command -v npm)" node <<'NODE'
+          const { createRequire } = require('node:module');
+          const { realpathSync, readFileSync, writeFileSync } = require('node:fs');
+          const { dirname, join } = require('node:path');
+          const npm = createRequire(realpathSync(process.env.QSYS_NPM_CLI));
+          const publish = createRequire(npm.resolve('libnpmpublish'));
+          const config = join(dirname(publish.resolve('sigstore')), 'config.js');
+          const source = readFileSync(config, 'utf8');
+          const disabled = source.match(/fetchOnConflict: false/g) ?? [];
+          const enabled = source.match(/fetchOnConflict: true/g) ?? [];
+          if (disabled.length === 1 && enabled.length === 0) {
+            writeFileSync(config, source.replace('fetchOnConflict: false', 'fetchOnConflict: true'));
+            console.log('Enabled Sigstore recovery of existing Rekor entries.');
+          } else if (disabled.length === 0 && enabled.length === 1) {
+            console.log('Sigstore recovery is already enabled.');
+          } else {
+            throw new Error('Unrecognized npm/Sigstore layout; review the upstream recovery fix.');
+          }
+          NODE
 
       # Trusted publishing (OIDC) authenticates with no token and attaches provenance.
       - name: Publish (npm, OIDC + provenance)

@@ -94,6 +94,31 @@ npm view qsys-mac version
 Create source-only GitHub Releases for npm packages after npm is live. Attach no
 assets; link to the npm package and package directory in the release notes.
 
+### Retrying a failed publication
+
+The `npm-publish` environment currently requires `reowens` review and permits
+self-review. An authenticated configured reviewer can approve the deployment
+under an already-authorized release; no separate manual browser step is needed.
+
+For npm provenance failures with `TLOG_CREATE_ENTRY_ERROR` / Rekor 409, the
+workflow enables Sigstore's existing duplicate-entry recovery in the disposable
+runner's npm client ([upstream fix](https://github.com/sigstore/sigstore-js/pull/1709)).
+It fetches the existing log entry and preserves provenance verification. The
+patch fails on an unknown client layout and should be removed when npm ships
+this recovery itself.
+
+If an existing release tag contains the older workflow, retry from the repaired
+workflow on main without moving the tag:
+
+```sh
+gh workflow run publish.yml --ref main -f release_tag=qsys-mcp-v0.6.1
+```
+
+The retry requires the tag and workflow commit to be on main and their source
+and build inputs to be identical. Only `publish.yml` and this release document
+may differ. Build, typecheck, tests, and packed-consumer checks still run. Verify
+whether the version is already on npm before retrying a failed run.
+
 ## MCP Registry
 
 `qsys-mcp` is registered as `io.github.reowens/qsys-mcp`.
