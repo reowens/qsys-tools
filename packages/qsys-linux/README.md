@@ -44,11 +44,14 @@ You can also open **Q-SYS Designer** from your desktop's application menu.
 The desktop launcher supports opening a design file; it does not change
 existing `.qsys` file associations.
 
-The recipe downloads checksum-pinned Wine and .NET installers. Wine's pin was
+The recipe downloads checksum-pinned Wine and x64 .NET runtime ZIPs. Wine's pin was
 verified against WineHQ's signed Ubuntu package index; the runtime SHA-512
 pins come from Microsoft's .NET 10 release metadata. Small Ubuntu extraction
 tools are downloaded through apt's authenticated package indexes and unpacked
 under this installation. It does not install system packages or add apt sources.
+The runtime ZIPs populate the staged Windows prefix directly, avoiding the
+32-bit installer bootstrapper. The Windows x64 host must report all three
+required frameworks before the installation can be committed.
 Some less complete Ubuntu installations may need additional Wine host libraries;
 setup reports missing linked libraries and keeps its installation log.
 

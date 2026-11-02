@@ -100,6 +100,56 @@ class RecipeTests(unittest.TestCase):
             pass
         self.assertEqual((target / 'keep').read_text(), 'user data')
 
+    def test_runtime_zip_extracts_host_and_framework_and_rejects_unsafe_members(self):
+        archive = self.root / 'runtime.zip'
+        prefix = self.root / 'prefix'
+        prefix.mkdir()
+        with zipfile.ZipFile(archive, 'w') as z:
+            z.writestr('dotnet.exe', b'host')
+            z.writestr('shared/Microsoft.NETCore.App/10.0.14/coreclr.dll', b'runtime')
+        recipe.extract_runtime(archive, prefix)
+        target = prefix / 'drive_c/Program Files/dotnet'
+        self.assertEqual((target / 'dotnet.exe').read_bytes(), b'host')
+        self.assertEqual((target / 'shared/Microsoft.NETCore.App/10.0.14/coreclr.dll').read_bytes(), b'runtime')
+        for name in ['../escape', '/absolute', 'C:/drive', 'a\\escape', 'a/../escape', 'dotnet.exe:stream']:
+            with self.subTest(name=name):
+                with zipfile.ZipFile(archive, 'w') as z:
+                    z.writestr('dotnet.exe', b'must not overwrite')
+                    z.writestr(name, b'bad')
+                with self.assertRaisesRegex(RuntimeError, 'Unsafe'):
+                    recipe.extract_runtime(archive, prefix)
+                self.assertEqual((target / 'dotnet.exe').read_bytes(), b'host')
+
+    def test_runtime_zip_refuses_archive_links_and_existing_prefix_links(self):
+        archive = self.root / 'runtime.zip'
+        prefix = self.root / 'prefix'
+        prefix.mkdir()
+        entry = zipfile.ZipInfo('linked')
+        entry.create_system = 3
+        entry.external_attr = 0o120777 << 16
+        with zipfile.ZipFile(archive, 'w') as z:
+            z.writestr(entry, 'outside')
+        with self.assertRaisesRegex(RuntimeError, 'Unsafe'):
+            recipe.extract_runtime(archive, prefix)
+        outside = self.root / 'outside'
+        outside.mkdir()
+        (prefix / 'drive_c').symlink_to(outside, target_is_directory=True)
+        with zipfile.ZipFile(archive, 'w') as z:
+            z.writestr('dotnet.exe', b'host')
+        with self.assertRaisesRegex(RuntimeError, 'symbolic link'):
+            recipe.extract_runtime(archive, prefix)
+        self.assertEqual(list(outside.iterdir()), [])
+
+    def test_runtime_check_requires_every_framework_at_the_pinned_version(self):
+        good = ''.join(f'{name} {recipe.DOTNET_VERSION} [C:\\dotnet]\n' for name in
+                       ['Microsoft.NETCore.App', 'Microsoft.WindowsDesktop.App', 'Microsoft.AspNetCore.App'])
+        with patch.object(recipe, 'run', return_value=subprocess.CompletedProcess([], 0, stdout=good)):
+            self.assertEqual(recipe.runtime_check(self.root, self.root / 'prefix', {}), good)
+        for output in [good.replace('Microsoft.WindowsDesktop.App', 'Wrong.Framework'), good.replace(recipe.DOTNET_VERSION, '10.0.0')]:
+            with patch.object(recipe, 'run', return_value=subprocess.CompletedProcess([], 0, stdout=output)):
+                with self.assertRaisesRegex(RuntimeError, 'failed to install'):
+                    recipe.runtime_check(self.root, self.root / 'prefix', {})
+
     def test_mutation_lock_protects_an_active_launch(self):
         target = self.root / 'managed'
         with recipe.owned_lock(target, create=True):
