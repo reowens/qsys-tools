@@ -126,4 +126,149 @@ Hermetic checks use no Wine or proprietary payload:
 pnpm --filter qsys-linux test
 ```
 
+## Container smoke tests
+
+The source checkout includes a vendor-free Ubuntu 26.04 `linux/amd64` test
+image with a private Xvfb/Openbox desktop. It runs the packaged `qsys-linux`
+CLI as UID 1000, independently of a locked host desktop. Docker commands are
+development tools in this checkout; they are not part of the npm launcher.
+Container `.deb` extraction uses current libarchive for compatibility with
+amd64 emulation. The image contains no Wine or Designer payload.
+
+Install the checkout's dependencies with `pnpm install --frozen-lockfile`, then
+run these commands from the monorepo root:
+
+```sh
+# Hermetic harness tests; no Docker daemon or proprietary inputs required.
+pnpm docker:test
+
+# Include current uncommitted public source in a local development image.
+pnpm docker:build --development --receipt ../artifacts/docker-image.json
+
+# Check the image, helpers and authenticated display without a vendor installer.
+docker run --rm --init --platform linux/amd64 --network none \
+  qsys-designer-test:local check
+
+# Supply only your own installer and an optional disposable design.
+pnpm docker:smoke --installer "/path/to/installer.zip" \
+  --design "/path/to/disposable design.qsys" \
+  --artifacts "../artifacts/docker-basic" --profile basic
+
+# Apple Silicon Docker Desktop: explicit experimental QEMU/Wine UI mode.
+pnpm docker:smoke --execution hybrid-qemu --emulator "/private/path/qemu-x86_64" \
+  --installer "/path/to/installer.zip" --design "/path/to/disposable design.qsys" \
+  --docker-data-dir "/actual/Docker/disk-image/directory" \
+  --artifacts "../artifacts/docker-pro-basic" --profile basic
+```
+
+The runner requires Node.js, host `python3`, an existing local image and Docker
+engine. Python supplies descriptor-relative artifact setup and macOS filesystem
+operations; nothing is installed implicitly. It streams only
+the selected installer/design and, in hybrid mode, the pinned emulator into private Docker volumes, mounts inputs read
+only for the test, exports results to the specified empty directory, and removes
+its own containers and volumes. It does not start Docker, pull images or alter
+daemon settings. The test container needs Internet access for the recipe's
+verified runtime downloads. The UI and Emulate remain on the default Docker
+bridge during this lifecycle, so they can reach the bridge gateway and peer
+containers; this does not establish network isolation. It uses no host display,
+host networking mode or privileged access. It drops Linux capabilities, blocks gaining privileges and limits the
+process count. Per-run downloads and installed data are removed with its volumes;
+the runner performs a fresh installation on each invocation. With
+`--cache-volume <name>`, it creates or reuses a volume labeled for runtime downloads
+and retains that volume. Each reused archive is checksum-verified. Work, home,
+prefix, vendor inputs and artifacts still use fresh per-run volumes and are removed.
+A named container lease excludes simultaneous cache users; a foreign volume or
+existing lease is refused. Remove your selected cache volume explicitly when no
+run is using it. The runner never prunes other Docker data.
+
+Defaults are `--memory 8g --cpus 4 --shm-size 1g`; adjust them to the admitted
+capacity of the machine. Passing runs can still hit this memory limit or use
+swap; inspect `resources` in the result, including `memory.stat` for anonymous
+memory versus file cache. Admission checks report insufficient engine resources
+or free space before staging private inputs. On macOS the runner also finds
+the bundled `/Applications/Docker.app/Contents/Resources/bin/docker` CLI.
+`--docker` and `--context` select an existing CLI/context. Local Mac runs also
+require `--docker-data-dir` pointing to the actual Docker disk-image directory
+shown in Docker Desktop settings; VM free space does not establish host capacity.
+The host filesystem must meet the install budget and `--host-free-floor` (40g
+by default). A context targeting
+another machine establishes execution on that machine; local Mac Docker
+Desktop requires its own Wine/.NET/CEF qualification.
+
+The default `native` mode requires an amd64 engine. An ARM64 engine requires
+explicit `--execution hybrid-qemu` and the qualified ARM64 QEMU binary described
+in [qemu-pin.json](docker/qemu-pin.json). Its checksum is checked both before
+staging and inside the image. The pin records the existing source image/path and
+upstream license/source references. This command neither downloads nor registers
+QEMU. The binary remains a separate runtime input and is not distributed in the
+test image or npm package.
+
+Hybrid mode provisions through the Docker engine's existing amd64 translator
+(Rosetta in the Apple Silicon qualification), then runs Designer/Wine through QEMU with
+explicit experimental .NET JIT settings and an image-built process-memory
+compatibility helper. Installation still needs that existing translator. See
+[execution qualification](docker/QUALIFICATION.md) for measured coverage and limits.
+
+`result.json` summarizes application and runner outcomes, and `runner.json` records
+the engine, image ID, execution policy, input hashes, budgets, artifact export and cleanup failures.
+`container/phases.json` records provisioning and application outcomes separately;
+`container/provisioning.json` binds the completed install to the run, installer
+and fresh prefix and records cache state before/after installation. A passing
+UI result cannot bypass failed or mismatched phase receipts. Raw application
+results, logs and screenshots are exported under `container/`; exported symlinks
+and special files are refused. Invalid application JSON remains there for diagnosis.
+Without `--artifacts`, output defaults to a private system temporary directory.
+Explicit artifact paths must not contain symlink ancestors; the error names the
+offending component. Use a canonical path or a relative path from the physical
+working directory. The configured temporary root and known macOS system aliases
+are resolved once before checking their descendants.
+The private host-only `journal/` directory contains immutable numbered snapshots
+of allocation intent and resource state, written before daemon allocation. It
+helps identify owned resources after a driver crash. An incomplete journal is
+recovery evidence, not an acceptance pass; require the successful CLI exit and
+validated result/phase receipts. SIGKILL or host failure cannot guarantee automatic
+cleanup. Inspect the recorded context, run labels and cache users before operator
+recovery, and release a stale cache lease only after its owned users are removed.
+Snapshots are synchronized for process-crash diagnosis, without a power-loss
+durability guarantee. A terminal journal failure after the authoritative receipts
+commit is a stderr warning and does not contradict their status or CLI exit.
+Docker exports artifacts as a tar stream, without a host destination pathname.
+The isolated Python extractor creates files through directory descriptors on
+Linux and macOS, so changing an output ancestor cannot redirect extraction.
+Only regular files and directories are allowed; links, special files, traversal,
+duplicates, case/Unicode-normalization path collisions (including parent
+directories) and malformed/truncated archives are rejected. Limits are 256 MiB per
+file, 1 GiB total file data, 4,096 tar headers (including metadata), 64 KiB per
+PAX metadata header and 32 path components. Export also has a 60-second deadline.
+A rejected export may leave regular partial files in `container/` for diagnosis;
+they do not establish a passing result. Keep the private artifact directory intact
+until inspection/recovery is complete.
+Logs and
+screenshots may contain your private design. Keep the entire output directory
+private. An unavailable or unimplemented required check must remain visible:
+`--profile full` fails for incomplete coverage. A basic pass covers only the
+checks recorded in its result. Container tests do not establish host clipboard,
+HiDPI, USB, real Core deployment or native Mac app behavior.
+
+To build a frozen committed revision, omit `--development` and optionally pass
+`--revision <full-commit-sha>`. The image receipt records source/context hashes,
+base digest and image identity. Explicit private publication uses:
+
+```sh
+pnpm docker:build --push --revision <full-commit-sha> \
+  --registry <registry-host/optional-prefix> --image qsys-designer-test \
+  --receipt ../artifacts/docker-publication.json
+```
+
+Publication requires existing Docker credentials and an operator-approved
+registry repository/retention policy. It refuses an existing immutable revision
+tag and uses a single `linux/amd64` manifest. Development images cannot be
+published through this command. A successful push immediately records its digest
+with `verification: "pending"`; inspection and pull checks must finish before
+the receipt becomes `verification: "verified"`. A failed verification preserves
+the published digest for recovery. Only explicitly staged public files and packed
+packages enter the build context; vendor payloads, designs and test artifacts
+must stay outside it. Pull the receipt's digest explicitly on another host,
+then select it with `--image <repository>@sha256:<digest>` when running smoke.
+
 The Linux recipe is MIT licensed under the monorepo's [LICENSE](../../LICENSE).

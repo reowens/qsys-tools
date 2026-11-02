@@ -54,6 +54,17 @@ jobs:
       # push with no hardware and no private dependency.
       - run: pnpm test
 
+      # Hermetic Docker application/phase/helper tests only. No Docker daemon,
+      # QEMU download, vendor installer or private design is needed in CI.
+      # The Node runner/build transport tests already run through pnpm test.
+      - name: Docker phase and compatibility tests
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 24
+        run: |
+          cc --version
+          python3 -m unittest discover -s packages/qsys-linux/docker -p test_application.py -v
+          python3 -m unittest discover -s packages/qsys-linux/docker -p test_procmem.py -v
+          python3 -m unittest discover -s packages/qsys-linux/docker -p test_execution.py -v
+
       # The npm consumer/recipe tests run in pnpm test above; the direct source
       # entry point also needs to remain valid POSIX shell.
       - name: Linux source launcher syntax

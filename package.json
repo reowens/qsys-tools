@@ -10,6 +10,9 @@
   },
   "scripts": {
     "qsys-mac": "tsx packages/qsys-mac/src/bin.ts",
+    "docker:build": "node packages/qsys-linux/scripts/docker-build.mjs",
+    "docker:smoke": "node packages/qsys-linux/scripts/docker-smoke.mjs",
+    "docker:test": "pnpm --filter qsys-qrc build && node --test packages/qsys-linux/test/docker-*.test.mjs packages/qsys-linux/docker/qrc-smoke.test.mjs && python3 -m unittest discover -s packages/qsys-linux/docker -p test_application.py -v && python3 -m unittest discover -s packages/qsys-linux/docker -p test_procmem.py -v && python3 -m unittest discover -s packages/qsys-linux/docker -p test_execution.py -v && python3 -I -m unittest discover -s packages/qsys-linux/test -p test_artifact_extract.py -v",
     "build": "pnpm -r build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "pnpm -r --if-present test"

@@ -1,0 +1,15 @@
+# This is an allowlist for an already dedicated staging context, not the repo.
+**
+!Dockerfile
+!.dockerignore
+!entrypoint.sh
+!dpkg-deb.py
+!smoke.py
+!qrc-smoke.mjs
+!execution.py
+!qemu-shim.py
+!qemu-pin.json
+!wine-procmem.c
+!image-receipt.schema.json
+!qsys-linux.tgz
+!qsys-qrc.tgz
