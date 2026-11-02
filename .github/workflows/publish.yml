@@ -11,8 +11,8 @@ name: Publish to npm
 #   2. the tagged commit is an ancestor of origin/main (no side-branch releases)
 #   3. typecheck + the full test suite pass on the exact tagged SHA
 #   4. the packed tarball installs into an empty project and resolves as a consumer
-# Actions are pinned to reviewed commit SHAs; the `npm-publish` environment lets repo
-# Settings → Environments add required-reviewer approval in front of the publish.
+# Actions are pinned to reviewed commit SHAs. The `npm-publish` environment admits only
+# qsys-*-v* tags and has no required reviewer, so a tag that passes these gates publishes.
 on:
   workflow_dispatch:
     inputs:
@@ -35,7 +35,7 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment: npm-publish # protection rules (required reviewers) are configured in repo settings
+    environment: npm-publish # tag restriction is configured in repo settings
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
