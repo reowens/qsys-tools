@@ -39,7 +39,7 @@ npx qsys-cli snapshot load Bank 1 --ramp 1
 
 ```
 $ qsys status
-Design     RobertOwens-L1 (code Hd4b6C9TXKzL)
+Design     Example-Design (code a1B2c3D4e5F6)
 Platform   Emulator (emulator)
 State      Active
 
