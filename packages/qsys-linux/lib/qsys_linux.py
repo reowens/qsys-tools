@@ -16,6 +16,7 @@ import shlex
 import shutil
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -31,10 +32,11 @@ WINE_ARTIFACT = (
     'https://dl.winehq.org/wine-builds/ubuntu/pool/main/w/wine-staging/wine-staging_11.20~resolute-1_amd64.deb',
     'sha256', '0429ca26cf940f78ae17bf5279779dffdc675878f07180c570bf9a34cdeb24c1')
 RUNTIMES = [
-    ('https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/10.0.14/windowsdesktop-runtime-10.0.14-win-x64.exe',
-     'sha512', '337dacab1636219147b3fe75e451bf5b1c17bca2c86328266d40c4ad1ff0a1e8391c4746ca7a5b702b65b61e8bfe834566cfc1b548cc10aef90b441357b10b69'),
-    ('https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.14/aspnetcore-runtime-10.0.14-win-x64.exe',
-     'sha512', '90045a7969d70453ac973ec3858105118e974f415c7cbd1a3cd7800b7442b291ea9f5b388a4ab79ab0d118e9fd330c9548a7e028d6d0e84daddec670a16bbb53'),
+    ('https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/10.0.14/windowsdesktop-runtime-10.0.14-win-x64.zip',
+     'sha512', '3214913702264452ac4b283b6fb2f6c14ab748cea36c7561608245c4a7d8cc10436a160032038865d039a016eab4975f65f1ae906de7615953fbec760f764ac4'),
+    # This archive supplies both Microsoft.AspNetCore.App and NETCore.App/host.
+    ('https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.14/aspnetcore-runtime-10.0.14-win-x64.zip',
+     'sha512', 'f26712cbc7a0c3de6c78c78d2ec80f5a96e3da97f3ce67e964a66bc2d8638cf02f67113c28be5431b2739b29732d918bc3210064b52c845fe914e56fcd058acb'),
 ]
 HELPER_PACKAGES = ['7zip', 'msitools', 'libmsi-1.0-0', 'libgcab-1.0-0', 'icoutils']
 APP_REL = Path('drive_c/QSC/Q-Sys Designer')
@@ -151,12 +153,46 @@ def environment(root, prefix):
     env['LD_LIBRARY_PATH'] = str(tools / 'usr/lib/x86_64-linux-gnu')
     env['WINEPREFIX'] = str(prefix)
     env['WINEARCH'] = 'win64'
+    env['DOTNET_ROOT'] = env['DOTNET_ROOT_X64'] = r'C:\Program Files\dotnet'
     env['WINEDEBUG'] = os.environ.get('QSYS_WINEDEBUG', '-all')
     env['WINEDLLOVERRIDES'] = 'mshtml=d'
     env['LIBGL_ALWAYS_SOFTWARE'] = '1'
     # The tested driver is X11, including when the user's desktop runs Wayland.
     env.pop('WAYLAND_DISPLAY', None)
     return env
+
+
+def extract_runtime(archive_path, prefix):
+    """Extract a verified runtime into the staged prefix, never through links."""
+    destination = prefix / 'drive_c/Program Files/dotnet'
+    with zipfile.ZipFile(archive_path) as archive:
+        members, seen = [], set()
+        for entry in archive.infolist():
+            name = entry.filename.rstrip('/')
+            parts = name.split('/')
+            mode = stat.S_IFMT(entry.external_attr >> 16)
+            if (not name or any(p in ('', '.', '..') for p in parts)
+                    or '\\' in name or ':' in name or entry.orig_filename != entry.filename
+                    or mode not in (0, stat.S_IFREG, stat.S_IFDIR)
+                    or name.casefold() in seen):
+                raise RuntimeError(f'Unsafe runtime archive member: {entry.filename}')
+            seen.add(name.casefold())
+            target = destination.joinpath(*parts)
+            for parent in [target, *target.parents]:
+                if parent == prefix:
+                    break
+                if parent.is_symlink():
+                    raise RuntimeError(f'Runtime path contains a symbolic link: {parent}')
+            members.append((entry, target))
+        # Validate every member before modifying the staged prefix.
+        for entry, target in members:
+            if entry.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o644)
+                with os.fdopen(fd, 'wb') as output, archive.open(entry) as source:
+                    shutil.copyfileobj(source, output, 1024 * 1024)
 
 
 @contextlib.contextmanager
@@ -198,7 +234,7 @@ def bootstrap(root, downloads, log):
         manifests = []
         # A fresh directory ensures unrelated .deb files in a supplied download
         # cache can never become part of the toolchain.
-        with tempfile.TemporaryDirectory(prefix='ubuntu-tools-', dir=downloads) as directory:
+        with tempfile.TemporaryDirectory(prefix='ubuntu-tools-') as directory:
             debs = Path(directory)
             run(['apt-get', 'download', *HELPER_PACKAGES], cwd=debs, stdout=log, stderr=log)
             for package in sorted(debs.glob('*.deb')):
@@ -452,11 +488,8 @@ def install(args):
                 say('Installing Windows .NET 10 Desktop and ASP.NET runtimes')
                 for spec in RUNTIMES:
                     runtime = artifact(spec, downloads)
-                    # Runtime presence is the final gate; some Wine builds return
-                    # a nonzero installer result despite laying down the runtime.
-                    result = subprocess.run([str(wine), str(runtime), '/install', '/quiet', '/norestart'],
-                                            env=init_env, timeout=180, stdout=log, stderr=log)
-                    log.write(f'Runtime installer exit: {result.returncode}\n')
+                    extract_runtime(runtime, stage)
+                    log.write(f'Extracted verified x64 runtime: {runtime.name}\n')
                 log.write(runtime_check(root, stage, env))
                 say('Assembling the full MSI layout')
                 prepare_payload(stage, app_files, old_record.get('app_files', []))
@@ -471,6 +504,8 @@ def install(args):
                 run([wine, 'regedit', '/S', registry], env=env, timeout=30, stdout=log, stderr=log)
                 manifest = {'schema': SCHEMA, 'designer': properties.get('ProductVersion', 'unknown'),
                             'wine': WINE_VERSION, 'dotnet': DOTNET_VERSION, 'scale_percent': percent,
+                            'dotnet_source': 'win-x64-zip',
+                            'dotnet_archives': [{'url': url, 'sha512': pin} for url, _, pin in RUNTIMES],
                             'installer_sha256': digest(installer), 'source_sha256': digest(source),
                             'app_files': app_files,
                             'installed_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}

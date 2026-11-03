@@ -36,9 +36,11 @@ gate publishes nothing:
 - Typecheck and the full test suite run on the exact tagged SHA (CI does not run
   on tag pushes, so the publish workflow runs the gates itself).
 - The packed tarball is installed into an empty project as a consumer smoke test.
-- The job runs in the `npm-publish` environment; the MCP registry workflow uses
-  `mcp-registry`. **One-time setup:** in repo Settings → Environments, create both
-  environments and add required reviewers so publication needs an approval click.
+- The job runs in the `npm-publish` environment, which admits only `qsys-*-v*` tags
+  and has no required reviewer: a release tag that passes these gates publishes
+  automatically. The MCP registry workflow uses `mcp-registry`. **One-time setup:** in
+  repo Settings → Environments, create both environments, restrict `npm-publish` to
+  that tag pattern, and add required reviewers to `mcp-registry`.
 
 **One-time setup (per package, on npmjs.com):** for each of `qsys-qrc`, `qsys-cli`,
 `qsys-mcp`, `qsys-mac`, open `npmjs.com/package/<name>/access` → **Trusted Publishers**
@@ -47,9 +49,15 @@ gate publishes nothing:
 access to "Require two-factor authentication and disallow tokens" — OIDC still works.)
 `qsys-mock-core` is `private` and is never published.
 
-`qsys-linux` is prepared at 0.1.0. Before its first tag-driven publication,
-create the npm package under the owner account and configure its trusted
-publisher for this repository and `publish.yml`. Its packed consumer test
+`qsys-linux` is prepared at 0.1.0. npm trusted publishing requires the package to
+exist, so 0.1.0 is published once by hand from a tarball built at the merged commit:
+confirm `npm whoami` is the intended owner with 2FA, then run `npm publish <tarball>`.
+That version has no build provenance. **Do not push a `qsys-linux-v0.1.0` tag
+afterward:** the workflow would try to publish a version that is already used. When
+the next real version is ready, configure the trusted publisher (repository
+`reowens/qsys-tools`, workflow `publish.yml`, environment `npm-publish`) and release
+it by tag. A new configuration expires unless its first publish succeeds within
+2 days, so configure it just before tagging. Its packed consumer test
 checks that the Python recipe, public MSI/font helpers, and OFL fonts are
 self-contained. The package contains no QSC installer, Wine, or .NET binaries;
 installing the npm package does not provision Designer automatically.
@@ -59,7 +67,7 @@ Before npm publication, a source preview may use the separate tag
 GitHub prerelease. The `qsys-linux-source-v*` tags do **not** trigger npm
 publishing. Build the tarball from that merged/tagged commit with
 `pnpm --filter qsys-linux pack`; inspect its contents and record its SHA-256
-in the release notes. Reserve `qsys-linux-v*` for actual npm releases.
+in the release notes. Reserve `qsys-linux-v*` for tag-driven npm releases after 0.1.0.
 
 To release a package, push its per-package tag — the workflow packs it with pnpm
 (which rewrites `workspace:^` → a real range) and publishes the tarball with OIDC +
@@ -96,9 +104,8 @@ assets; link to the npm package and package directory in the release notes.
 
 ### Retrying a failed publication
 
-The `npm-publish` environment currently requires `reowens` review and permits
-self-review. An authenticated configured reviewer can approve the deployment
-under an already-authorized release; no separate manual browser step is needed.
+The `npm-publish` environment has no required reviewer, so a retry dispatched from
+an admitted tag runs without an approval step.
 
 For npm provenance failures with `TLOG_CREATE_ENTRY_ERROR` / Rekor 409, the
 workflow enables Sigstore's existing duplicate-entry recovery in the disposable
