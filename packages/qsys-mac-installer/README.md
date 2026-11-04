@@ -59,11 +59,10 @@ Direct signed-DMG path: download
 open `Q-SYS Mac Installer.app`, and drop your Q-SYS Designer installer into the window for a fresh
 install or explicit reinstall.
 
-npm/bootstrapper path, which still pins the 0.1.8 DMG and its .NET 8 recipe, so it suits Designer
-10.4.x. For Designer 10.5.1, use the 0.1.9 DMG above or Homebrew:
+npm/bootstrapper path:
 
 ```sh
-npx qsys-mac install "/path/to/Q-SYS Designer Installer 10.4.0.exe"
+npx qsys-mac install "/path/to/Q-SYS Designer Installer 10.5.1.exe"
 open -a "/Applications/Q-SYS Designer.app"
 ```
 

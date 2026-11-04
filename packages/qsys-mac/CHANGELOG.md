@@ -6,6 +6,14 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-03
+
+### Changed
+
+- `DEFAULT_RELEASE` now points at the `qsys-mac-installer 0.1.9` signed DMG, which
+  selects the .NET runtime matching the supplied Designer: .NET 10 for Designer 10.5
+  and .NET 8 for Designer 10.4.
+
 ## [0.1.8] - 2026-07-28
 
 ### Changed

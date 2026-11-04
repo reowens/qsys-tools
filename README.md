@@ -111,11 +111,10 @@ Direct DMG path:
 open https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.9
 ```
 
-Or use the npm bootstrapper, which still pins the 0.1.8 DMG and its .NET 8 recipe, so it suits
-Designer 10.4.x. For Designer 10.5.1, use the DMG above or Homebrew:
+Or use the npm bootstrapper:
 
 ```sh
-npx qsys-mac install "/path/to/Q-SYS Designer Installer 10.4.0.exe"
+npx qsys-mac install "/path/to/Q-SYS Designer Installer 10.5.1.exe"
 ```
 
 It downloads and verifies the signed Q-SYS Mac Installer DMG, mounts it, and runs
