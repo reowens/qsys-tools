@@ -103,6 +103,19 @@ Segoe UI font shim. No CEF flags are passed: Designer treats a leading argument
 as a design filename. Launch converts the optional Linux filename via Wine's
 `winepath` and forwards it as the single design argument.
 
+## Several designs open at once
+
+Designer opens each design in its own process, and New Design starts another, as QSC's help
+describes. Only 1 design can emulate at a time, which is also QSC's behaviour.
+
+- **Opening another design:** File > Open and a second `qsys-linux launch <design>` both work while
+  a design is open.
+- **Closing a design:** Wine stops only after the last design closes. Until then `qsys-linux launch`
+  stays running and says it is waiting for the other designs. Ctrl+C on that wait leaves the other
+  designs open.
+- **Install and remove:** `install` and `remove` refuse while a `qsys-linux launch` is running. After
+  Ctrl+C on the wait they no longer refuse, so close the remaining designs first.
+
 ## Validation and limits
 
 On Ubuntu 26.04 x86-64, Designer 10.5.1 rendered on the native XWayland desktop.

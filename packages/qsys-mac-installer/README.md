@@ -346,9 +346,12 @@ Every launch token is load-bearing — these were each a debugging session:
 
 ### Several designs open at once
 
-Designer opens each design in its own process. `Q-SYS Designer.app` registers the first one, and
-Designer starts the later ones itself. Each shows the Q-SYS Designer name, icon and app menu in the
-Dock, because the Wine loader's real file is named `Q-SYS Designer` with `wine` as a link to it.
+Designer opens each design in its own process, and New Design starts another, as QSC's help
+describes. Only 1 design can emulate at a time, which is also QSC's behaviour.
+
+`Q-SYS Designer.app` registers the first process, and Designer starts the later ones itself. Each
+shows the Q-SYS Designer name, icon and app menu in the Dock, because the Wine loader's real file is
+named `Q-SYS Designer` with `wine` as a link to it.
 
 - **Closing a design:** Wine stops only after the last design closes. Until then the launcher's
   helper stays registered with no Dock tile or menu, so macOS marks the app as running in the
