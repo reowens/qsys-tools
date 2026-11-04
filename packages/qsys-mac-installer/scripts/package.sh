@@ -27,7 +27,7 @@
 # Usage:
 #   scripts/package.sh                                  # dry: build + ad-hoc sign + unsigned dmg
 #   DEV_ID="Developer ID Application: … (7GSPYYN5X8)" \
-#     NOTARY_PROFILE=qsys-notary  scripts/package.sh    # real: sign + notarize + staple + dmg
+#     NOTARY_PROFILE=my-notary-profile  scripts/package.sh    # real: sign + notarize + staple + dmg
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

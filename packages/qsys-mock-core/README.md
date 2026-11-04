@@ -36,9 +36,8 @@ await mock.close();
 This is deliberately a **mock**, not the full article. It implements the QRC
 control plane against a design you supply, and it ships **no designs of its own**.
 It intentionally leaves out the depth of a full emulator — ramp interpolation on a
-tick loop, animated meters, validated-against-Designer rendering nuances, and a
-library of real Q-SYS training designs. That fidelity lives in a separate, fuller
-emulator used for deeper conformance testing. This package covers what the public
+tick loop, animated meters and validated-against-Designer rendering nuances. That
+fidelity lives in a separate, fuller emulator used for deeper conformance testing. This package covers what the public
 [`qsys-tools`](https://github.com/reowens/qsys-tools) e2e suites need in CI.
 
 MIT-licensed.

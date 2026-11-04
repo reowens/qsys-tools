@@ -210,7 +210,7 @@ Build and notarize from `packages/qsys-mac-installer`:
 
 ```sh
 DEV_ID="Developer ID Application: Robert Owens (7GSPYYN5X8)" \
-  NOTARY_PROFILE=qsys-notary \
+  NOTARY_PROFILE=my-notary-profile \
   scripts/package.sh 2>&1 | tee dist/package-rebuild.log
 ```
 

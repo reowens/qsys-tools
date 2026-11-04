@@ -193,8 +193,8 @@ The e2e suites (QRC integration, the MCP-over-mock end-to-end, and the
 transparent-reconnect/AutoPoll-replay regression) run against
 [`qsys-mock-core`](packages/qsys-mock-core) — an in-repo, design-driven Q-SYS Core
 mock — so `pnpm test` exercises the full protocol with no hardware. Deeper
-conformance testing (validated-against-Designer rendering, ramps/meters, and a
-library of real Q-SYS designs) uses a separate, fuller emulator.
+conformance testing (validated-against-Designer rendering and ramps/meters) uses a
+separate, fuller emulator.
 
 `qsys-mac-installer` builds separately with Xcode — see
 [`packages/qsys-mac-installer`](packages/qsys-mac-installer) (`scripts/package.sh` for the

@@ -243,19 +243,18 @@ hardened runtime.
 
 ```sh
 # one-time: create a Developer ID Application cert (team 7GSPYYN5X8) and store notary creds
-xcrun notarytool store-credentials qsys-notary   # API key OR apple-id + app-specific password
+xcrun notarytool store-credentials my-notary-profile   # API key OR apple-id + app-specific password
 
 # dry run (ad-hoc, no Apple round-trip) — proves the sweep + dmg build
 scripts/package.sh
 
 # real, shippable, notarized dmg
 DEV_ID="Developer ID Application: Robert Owens (7GSPYYN5X8)" \
-  NOTARY_PROFILE=qsys-notary  scripts/package.sh
+  NOTARY_PROFILE=my-notary-profile  scripts/package.sh
 ```
 
-Gated only on the **Developer ID Application** certificate being in the keychain — the
-platform's existing Developer ID *Installer* cert (used for Wi-Fi config profiles) is a
-different type and can't sign apps; create the Application cert under the same membership.
+Gated only on the **Developer ID Application** certificate being in the keychain. A
+Developer ID *Installer* cert is a different type and can't sign apps.
 
 ### Headless CLI (`qsys-mac`)
 
