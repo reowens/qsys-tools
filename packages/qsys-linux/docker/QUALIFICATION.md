@@ -31,8 +31,16 @@ The Python phase/helper tests are wired into Linux CI without vendor inputs.
 
 This qualifies the recorded basic fixture cases on these two hosts. Full-profile
 coverage, fully Rosetta-free cold provisioning, broader lifecycle/concurrency
-scenarios, a committed-source build, local Mac image building and registry
-publication remain separate work.
+scenarios, local Mac image building and registry publication remain separate work.
+
+## Committed-source basic run, 2026-11-03
+
+`pnpm docker:build --revision` built image ID
+`sha256:f6cdb50396e157c58d1829daf3596268650126dc67dd51b592d428ca106eb062` from
+commit `efd1151` (a local image ID, not a published registry digest). Its receipt
+records source mode `committed`, verification `verified` and published `false`. On
+the Linux host, native amd64, the basic profile passed 17 cases and skipped the 4
+full-profile cases. A published image needs its own build and basic run.
 
 ## Apple Silicon investigation, 2026-10-30
 
