@@ -166,12 +166,73 @@ enum DataDir {
     }
 
     /// `--reap` mode: block until `pid` (the launcher-become-wine) exits — clean quit OR crash —
-    /// then `wineserver -k`. kqueue/NOTE_EXIT is a precise, race-free wait; if the pid is already
-    /// gone (registration fails with ESRCH), reap immediately.
+    /// then wait for every other Designer on this install, then tear down. Designer opens each
+    /// design in its own process, so stopping Wine at the first exit would end the others with no
+    /// save prompt. One reaper covers all of them: a later launcher's reaper finds the lock held
+    /// and leaves. kqueue/NOTE_EXIT is a precise, race-free wait; if the pid is already gone
+    /// (registration fails with ESRCH), carry on at once.
     static func reapAfter(pid: pid_t) -> Never {
+        guard takeReaperLock() else { exit(0) }
         if pid > 0 { waitForExit(pid: pid) }
+        while designerIsRunning() { Thread.sleep(forTimeInterval: 1) }
         teardownWine()
         exit(0)
+    }
+
+    /// Held until this process exits. A failed open still reaps: a second reaper is safer than none.
+    private static func takeReaperLock() -> Bool {
+        let fd = open("\(root)/.reaper.lock", O_WRONLY | O_CREAT, 0o600)
+        guard fd >= 0 else { return true }
+        return flock(fd, LOCK_EX | LOCK_NB) == 0
+    }
+
+    /// True while a Designer on this install is running, or a launcher is about to become one.
+    /// A Designer started from File > Open has only a Windows path in its command line, so the
+    /// install is matched on the executable. An unreadable process list counts as running,
+    /// because tearing down a running Designer loses work and waiting does not.
+    private static func designerIsRunning() -> Bool {
+        let ps = Process()
+        let output = Pipe()
+        ps.executableURL = URL(fileURLWithPath: "/bin/ps")
+        ps.arguments = ["-axww", "-o", "pid=,command="]
+        ps.standardOutput = output
+        ps.standardError = FileHandle.nullDevice
+        guard (try? ps.run()) != nil else { return true }
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        ps.waitUntilExit()
+        guard ps.terminationStatus == 0 else { return true }
+        for line in String(decoding: data, as: UTF8.self).split(separator: "\n") {
+            let fields = line.split(separator: " ", maxSplits: 1)
+            guard fields.count == 2, let pid = pid_t(fields[0]) else { continue }
+            if keepsWineAlive(command: String(fields[1]), executable: executablePath(of: pid)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    static func keepsWineAlive(command: String, executable: String?) -> Bool {
+        guard let executable else { return false }
+        if executable == resolvedLauncher { return !command.contains("--reap") }
+        guard executable.hasPrefix("\(resolvedWineApp)/") else { return false }
+        let lowered = command.lowercased()
+        return lowered.contains("q-sys designer.exe") && !lowered.contains("browsersubprocess")
+    }
+
+    // The kernel reports real paths, so a symlinked home or data folder has to match them too.
+    private static let resolvedLauncher = Bundle.main.executablePath.map(realPath)
+    private static let resolvedWineApp = realPath(wineApp)
+
+    private static func realPath(_ path: String) -> String {
+        guard let real = realpath(path, nil) else { return path }
+        defer { free(real) }
+        return String(cString: real)
+    }
+
+    private static func executablePath(of pid: pid_t) -> String? {
+        var buffer = [CChar](repeating: 0, count: 4096)   // PROC_PIDPATHINFO_MAXSIZE
+        guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
+        return String(cString: buffer)
     }
 
     /// Block until `pid` (the launcher-become-wine) exits — clean quit OR crash. kqueue/NOTE_EXIT is
@@ -214,7 +275,7 @@ enum DataDir {
     }
 
     /// Reap any Wine processes still bound to our prefix (winedevice/CefSharp/wineserver) after
-    /// Designer's process exits — clean quit OR crash. The durable teardown: even a hung Designer
+    /// the last Designer exits — clean quit OR crash. The durable teardown: even a hung Designer
     /// gets killed instead of orphaning to PPID 1. `wineserver -k` signals the whole prefix tree.
     static func teardownWine() {
         if FileManager.default.isExecutableFile(atPath: wineserver) {

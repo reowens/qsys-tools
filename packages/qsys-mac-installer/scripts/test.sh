@@ -20,6 +20,7 @@ bash -n \
   "$ROOT/qsys-mac" \
   "$ROOT/scripts/smoke-provision.sh" \
   "$ROOT/scripts/test-process-cleanup.sh" \
+  "$ROOT/scripts/test-reaper.sh" \
   "$ROOT/scripts/test.sh" \
   "$ROOT/scripts/update-homebrew-cask.sh"
 
@@ -161,6 +162,9 @@ say "  ok: probe reports ok/inconclusive correctly and never false-blocks"
 
 say "checking process cleanup harness"
 "$ROOT/scripts/test-process-cleanup.sh"
+
+say "checking the launcher reaper"
+"$ROOT/scripts/test-reaper.sh"
 
 if [ "${QSYS_SKIP_XCODE:-0}" = "1" ]; then
   say "skipping Xcode build (QSYS_SKIP_XCODE=1)"

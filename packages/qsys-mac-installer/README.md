@@ -205,6 +205,7 @@ Validate helper parity with:
 scripts/compare-assemble-msi.sh "/path/to/Q-SYS Designer Installer 10.4.0.exe"
 scripts/compare-rename-font-family.sh
 scripts/test-process-cleanup.sh
+scripts/test-reaper.sh
 ```
 
 ## Distribution — signed & notarized `.dmg`
