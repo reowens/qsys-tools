@@ -160,6 +160,21 @@ say "checking loopback probe (qsys-mac doctor)"
 )
 say "  ok: probe reports ok/inconclusive correctly and never false-blocks"
 
+say "checking the Wine loader's file name"
+(
+  loader_dir="$(mktemp -d)"; trap 'rm -rf "$loader_dir"' EXIT
+  printf 'loader' > "$loader_dir/wine"
+  APP_NAME="Q-SYS Designer"
+  warn() { :; }
+  eval "$(sed -n '/^name_loader_file()/,/^}/p' "$ROOT/lib/recipe.sh")"
+  name_loader_file "$loader_dir/wine"
+  name_loader_file "$loader_dir/wine"
+  [ "$(readlink "$loader_dir/wine")" = "Q-SYS Designer" ] || die "wine is not a link to the renamed loader"
+  [ "$(cat "$loader_dir/wine")" = "loader" ] || die "the renamed loader lost its contents"
+  [ -f "$loader_dir/Q-SYS Designer" ] && [ ! -L "$loader_dir/Q-SYS Designer" ] || die "the renamed loader is not a real file"
+)
+say "  ok: the loader's real file is named for the Dock, and repeating is safe"
+
 say "checking process cleanup harness"
 "$ROOT/scripts/test-process-cleanup.sh"
 

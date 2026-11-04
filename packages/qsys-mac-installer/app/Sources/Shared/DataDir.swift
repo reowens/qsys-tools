@@ -6,6 +6,7 @@
 // under ~/Library/Application Support — NOT inside the .app bundle, because a notarized
 // app can't write into its own signed bundle. The recipe is told this path via WRAP_HOME.
 
+import AppKit
 import Foundation
 
 enum DataDir {
@@ -149,9 +150,8 @@ enum DataDir {
     }
 
     /// Spawn a detached copy of ourselves in `--reap <pid>` mode to watch `pid` (this process, which
-    /// is about to become wine via execve) and reap stragglers when it exits. The reaper never creates
-    /// an NSApplication → it's invisible (no Dock tile, no menu), so the visible identity stays
-    /// entirely with the execve'd wine. This is how we get quit-time teardown without the
+    /// is about to become wine via execve) and reap stragglers when it exits. The reaper shows no Dock
+    /// tile or menu, so the visible identity stays entirely with the execve'd wine. This is how we get quit-time teardown without the
     /// supervise-child Dock-name regression (wine-as-child ⇒ LSDisplayName "wine").
     static func spawnReaper(watching pid: pid_t) {
         guard let me = Bundle.main.executablePath else { return }
@@ -175,8 +175,23 @@ enum DataDir {
     static func reapAfter(pid: pid_t) -> Never {
         takeReaperLock()
         if pid > 0 { waitForExit(pid: pid) }
-        while designerIsRunning() { Thread.sleep(forTimeInterval: 1) }
+        if designerIsRunning() { stayRegisteredUntilLastDesignerExits() }
         teardownWine()
+        exit(0)
+    }
+
+    /// macOS 27 reports an app as running in the background once its registered process has gone
+    /// and its other processes remain, and later Designers are not the registered process. Holding
+    /// the registration here, as an accessory with no Dock tile or menu, keeps that report honest.
+    private static func stayRegisteredUntilLastDesignerExits() -> Never {
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        DispatchQueue.global().async {
+            while designerIsRunning() { Thread.sleep(forTimeInterval: 1) }
+            teardownWine()
+            exit(0)
+        }
+        app.run()
         exit(0)
     }
 

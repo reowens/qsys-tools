@@ -84,7 +84,7 @@ set_dotnet_profile 10
 : "${CACHE:=$WRAP_HOME/cache}"                  # bundled (Tier B) deps live here; override to the app's Resources/cache
 WINEDIR="$WINE_APP/Contents/Resources/wine"
 WINE="$WINEDIR/bin/wine"
-# Naming: a "renamed loader" does NOT change what macOS shows — wine re-execs into
+# Naming: renaming bin/wine does NOT change what macOS shows — wine re-execs into
 # its core image at lib/wine/x86_64-unix/wine and the OS keys identity on that
 # (verified 3 ways + Wine source). The bold MENU-BAR name is AppKit's applicationName,
 # which it reads ONCE at init from the *main bundle's* CFBundleName (via LaunchServices)
@@ -92,6 +92,8 @@ WINE="$WINEDIR/bin/wine"
 # CFBundleGetMainBundle() synthesizes a bundle from the loader's own dir and reads an
 # Info.plist sitting beside it if present. So:
 #   • Dock/Finder name  -> the .app's CFBundleName (works via LaunchServices/open).
+#   • Later Dock name   -> a Designer from File > Open is not the .app, so the Dock uses the
+#                          loader's real file name (name_loader_file).
 #   • Menu-bar name     -> patch the unix loader's EMBEDDED __info_plist CFBundleName
 #                          (patch_loader_bundle_name). Fixes the bold app menu AND the
 #                          "Quit/Hide <name>" items, on STOCK wine. No winemac patch,
@@ -622,6 +624,7 @@ patch_loader_bundle_name() {
     [ -f "$QSYS_PREPATCHED_LOADER" ] || die "prepatched wine loader not found: $QSYS_PREPATCHED_LOADER"
     cp -f "$QSYS_PREPATCHED_LOADER" "$loader" || die "prepatched loader copy failed → $loader"
     codesign --force -s - "$loader" >/dev/null 2>&1 || true
+    name_loader_file "$loader"
     return 0
   fi
   if ! command -v python3 >/dev/null 2>&1 || ! command -v otool >/dev/null 2>&1; then
@@ -633,6 +636,17 @@ patch_loader_bundle_name() {
   else
     warn "menu-bar rename skipped (loader plist didn't fit) — reads \"wine\"; cosmetic."
   fi
+  name_loader_file "$loader"
+}
+
+# Give the loose loader's real file $APP_NAME and leave "wine" as a symlink, because Wine finds it
+# by that name. A Designer started from File > Open is not the registered app, and the Dock names
+# such a process after its real executable file. Arg $1 = the loader path. Safe to repeat.
+name_loader_file() {
+  local loader="$1"
+  [ -L "$loader" ] && return 0
+  mv -f "$loader" "$(dirname "$loader")/$APP_NAME" || die "could not rename the Wine loader: $loader"
+  ln -s "$APP_NAME" "$loader" || die "could not link the Wine loader: $loader"
 }
 
 # Compile the in-process app-menu shim (lib/appmenu.m) to $1 and ad-hoc sign it. The shim

@@ -12,9 +12,10 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   each design in its own process, and the launcher stopped Wine as soon as the design
   opened first closed, so the other designs ended with no save prompt and lost unsaved
   work. Wine now stops after the last design closes. Installs from 0.1.9 and earlier keep
-  the bug until the DMG ships and `DEFAULT_RELEASE` points at it. While only a later design
-  stays open, macOS can mark the app as running in the background, because that process is
-  not the registered app; earlier versions ended those designs before macOS could.
+  the bug until the DMG ships and `DEFAULT_RELEASE` points at it.
+- The same DMG names a design opened from File > Open "Q-SYS Designer" in the Dock instead of
+  "wine". Its loader file is renamed to do this, so a firewall rule written for the old path
+  needs writing again.
 
 ## [0.1.9] - 2026-11-03
 
