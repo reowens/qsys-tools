@@ -196,7 +196,7 @@ def extract_runtime(archive_path, prefix):
 
 
 @contextlib.contextmanager
-def owned_lock(root, create=False):
+def owned_lock(root, create=False, shared=False):
     if root.is_symlink() or root.resolve() in [Path('/'), Path.home().resolve()]:
         raise RuntimeError('Refusing an unsafe installation directory')
     marker = root / '.qsys-linux-owned'
@@ -212,10 +212,10 @@ def owned_lock(root, create=False):
         raise RuntimeError('Missing installation ownership marker')
     with (root / '.operation.lock').open('a') as lock:
         try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(lock, (fcntl.LOCK_SH if shared else fcntl.LOCK_EX) | fcntl.LOCK_NB)
         except BlockingIOError as error:
             raise RuntimeError('Designer or another installation operation is running; close it first') from error
-        yield
+        yield lock
 
 
 def bootstrap(root, downloads, log):
@@ -534,11 +534,37 @@ def manifest(root):
     return record
 
 
+def designer_running(root):
+    """File > Open starts a Designer with only a Windows path, so match this install's binary."""
+    toolchain = f'{root.resolve() / "toolchain"}/'
+    for entry in Path('/proc').iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            executable = os.readlink(entry / 'exe')
+            command = (entry / 'cmdline').read_bytes()
+        except OSError:
+            continue
+        if (executable.startswith(toolchain) and EXE_NAME.encode() in command
+                and b'BrowserSubprocess' not in command):
+            return True
+    return False
+
+
+def last_launch(lock):
+    """Only the last launch holding the lock stops Wine; another one may still be starting."""
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return False
+    return True
+
+
 def launch(args):
     root = args.data_dir
     manifest(root)
     display_check()
-    with owned_lock(root):
+    with owned_lock(root, shared=True) as lock:
         wine, server = wine_paths(root)
         env = environment(root, root / 'prefix')
         argv = [wine, root / 'prefix' / APP_REL / EXE_NAME]
@@ -549,10 +575,19 @@ def launch(args):
         with (root / 'designer.log').open('a') as log:
             say(f'Launching Designer; log: {root / "designer.log"}')
             child = subprocess.Popen([str(a) for a in argv], env=env, stdout=log, stderr=log)
+            cancelled = True
             try:
                 result = child.wait()
+                # Designer opens each design in its own process; stopping Wine now would end the
+                # others with no save prompt. An interrupted launch still stops everything.
+                if designer_running(root):
+                    say('Waiting for the other open designs to close')
+                    while designer_running(root):
+                        time.sleep(1)
+                cancelled = False
             finally:
-                subprocess.run([str(server), '-k'], env=env, timeout=30, stdout=log, stderr=log)
+                if cancelled or last_launch(lock):
+                    subprocess.run([str(server), '-k'], env=env, timeout=30, stdout=log, stderr=log)
                 child.wait(timeout=30)
             if result:
                 raise RuntimeError(f'Designer exited with status {result}; see {root / "designer.log"}')

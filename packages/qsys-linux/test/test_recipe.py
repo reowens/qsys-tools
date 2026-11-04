@@ -10,6 +10,7 @@ import subprocess
 import shutil
 import tempfile
 import unittest
+import unittest.mock
 from unittest.mock import patch
 import zipfile
 import sys
@@ -155,6 +156,89 @@ class RecipeTests(unittest.TestCase):
         with recipe.owned_lock(target, create=True):
             with self.assertRaisesRegex(RuntimeError, 'running'), recipe.owned_lock(target):
                 pass
+
+    def test_launches_share_the_lock_and_still_block_mutation(self):
+        target = self.root / 'managed'
+        with recipe.owned_lock(target, create=True):
+            pass
+        with recipe.owned_lock(target, shared=True), recipe.owned_lock(target, shared=True):
+            with self.assertRaisesRegex(RuntimeError, 'running'), recipe.owned_lock(target):
+                pass
+        with recipe.owned_lock(target):
+            with self.assertRaisesRegex(RuntimeError, 'running'), recipe.owned_lock(target, shared=True):
+                pass
+
+    def run_launch(self, running, wait=None):
+        target = self.root / 'managed'
+        with recipe.owned_lock(target, create=True):
+            pass
+        child = unittest.mock.Mock()
+        child.wait.side_effect = wait or [0, 0]
+        args = argparse.Namespace(data_dir=target, design=None)
+        with patch.object(recipe, 'manifest'), patch.object(recipe, 'display_check'), \
+                patch.object(recipe, 'environment', return_value={}), \
+                patch.object(recipe, 'designer_running', side_effect=running) as scan, \
+                patch.object(recipe.time, 'sleep'), \
+                patch.object(recipe.subprocess, 'Popen', return_value=child), \
+                patch.object(recipe.subprocess, 'run') as stop:
+            try:
+                recipe.launch(args)
+            except KeyboardInterrupt:
+                pass
+        return scan, [call for call in stop.call_args_list if '-k' in call.args[0]]
+
+    def test_launch_keeps_wine_until_the_other_designs_close(self):
+        order = []
+        def running(_root):
+            order.append('scan')
+            return len(order) < 3
+        scan, stops = self.run_launch(running)
+        self.assertEqual(scan.call_count, 3)
+        self.assertEqual(len(stops), 1)
+
+    def test_launch_stops_wine_at_once_when_it_is_the_only_design(self):
+        scan, stops = self.run_launch([False])
+        self.assertEqual(scan.call_count, 1)
+        self.assertEqual(len(stops), 1)
+
+    def test_interrupted_launch_stops_wine_without_waiting(self):
+        scan, stops = self.run_launch([True], wait=[KeyboardInterrupt(), 0])
+        self.assertEqual(scan.call_count, 0)
+        self.assertEqual(len(stops), 1)
+
+    def test_only_the_last_launch_stops_wine(self):
+        target = self.root / 'managed'
+        with recipe.owned_lock(target, create=True):
+            pass
+        with recipe.owned_lock(target, shared=True) as other, recipe.owned_lock(target, shared=True) as mine:
+            self.assertFalse(recipe.last_launch(mine))
+            self.assertTrue(recipe.last_launch(other))
+
+    @unittest.skipUnless(Path('/proc/self/exe').exists(), 'needs /proc')
+    def test_designer_running_matches_this_install_by_executable(self):
+        root = self.root / 'managed'
+        binary = root / 'toolchain/opt/wine-staging/bin/wine64-preloader'
+        binary.parent.mkdir(parents=True)
+        shutil.copy2(shutil.which('bash'), binary)
+        elsewhere = self.root / 'elsewhere/toolchain/preloader'
+        elsewhere.parent.mkdir(parents=True)
+        shutil.copy2(shutil.which('bash'), elsewhere)
+        def start(path, name):
+            process = subprocess.Popen([name, '-c', 'read -t 30'], executable=path, stdin=subprocess.PIPE)
+            self.addCleanup(process.stdin.close)
+            self.addCleanup(process.wait)
+            self.addCleanup(process.kill)
+            return process
+        windows_path = 'C:\\QSC\\Q-Sys Designer\\Q-Sys Designer.exe'
+        self.assertFalse(recipe.designer_running(root))
+        other = start(elsewhere, windows_path)
+        helper = start(binary, 'C:\\QSC\\Q-Sys Designer\\CefSharp.BrowserSubprocess.exe')
+        self.assertFalse(recipe.designer_running(root))
+        other.kill(), helper.kill(), other.wait(), helper.wait()
+        designer = start(binary, windows_path)
+        self.assertTrue(recipe.designer_running(root))
+        designer.kill(), designer.wait()
+        self.assertFalse(recipe.designer_running(root))
 
     def test_scale_rejects_invalid_or_unusable_values(self):
         for value in ['0', '10000', 'not-a-number']:

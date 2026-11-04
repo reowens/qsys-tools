@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Closing the design opened first no longer ends the other open designs. Designer opens each
+  design in its own process, and `launch` stopped Wine as soon as its own design closed, so the
+  others ended with no save prompt and lost unsaved work. Wine now stops after the last design
+  closes.
+- `qsys-linux launch` works while another design is open. Install and remove still refuse.
+
 ## [0.1.0] - 2026-11-02
 
 - Initial Ubuntu 26.04 x86-64 installer and launcher for Q-SYS Designer 10.5.1.
