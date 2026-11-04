@@ -206,6 +206,11 @@ class RecipeTests(unittest.TestCase):
         self.assertEqual(scan.call_count, 0)
         self.assertEqual(len(stops), 1)
 
+    def test_interrupting_the_wait_leaves_the_other_designs_running(self):
+        scan, stops = self.run_launch([True, KeyboardInterrupt()])
+        self.assertEqual(scan.call_count, 2)
+        self.assertEqual(stops, [])
+
     def test_only_the_last_launch_stops_wine(self):
         target = self.root / 'managed'
         with recipe.owned_lock(target, create=True):

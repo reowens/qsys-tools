@@ -80,18 +80,21 @@ wait_exit "$REAPER" "a Designer on another install held the reaper up"
 [ "$(stops)" = 1 ] || tdie "expected 1 Wine stop, got $(stops)"
 kill "$other"; wait "$other" 2>/dev/null || true
 
-tsay "a second reaper leaves and the first one covers its Designer"
+tsay "a second reaper waits and takes over if the first one dies"
 reset
 sleep 30 & first=$!
 reap "$first"; primary=$REAPER
 sleep 1
 sleep 30 & later=$!
-reap "$later"
-wait_exit "$REAPER" "the second reaper did not leave"
-kill -0 "$primary" 2>/dev/null || tdie "the first reaper left early"
-[ "$(stops)" = 0 ] || tdie "the second reaper stopped Wine"
+reap "$later"; second=$REAPER
+sleep 1
+kill -0 "$second" 2>/dev/null || tdie "the second reaper left"
+kill -9 "$primary"; wait "$primary" 2>/dev/null || true
+sleep 1
+kill -0 "$second" 2>/dev/null || tdie "the second reaper did not take over"
+[ "$(stops)" = 0 ] || tdie "Wine was stopped while a watched process was running"
 kill "$first" "$later"; wait "$first" "$later" 2>/dev/null || true
-wait_exit "$primary" "the first reaper did not finish"
+wait_exit "$second" "the second reaper did not finish"
 [ "$(stops)" = 1 ] || tdie "expected 1 Wine stop, got $(stops)"
 
 tsay "all reaper checks passed"

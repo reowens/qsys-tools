@@ -575,18 +575,20 @@ def launch(args):
         with (root / 'designer.log').open('a') as log:
             say(f'Launching Designer; log: {root / "designer.log"}')
             child = subprocess.Popen([str(a) for a in argv], env=env, stdout=log, stderr=log)
-            cancelled = True
+            stop_wine = True
             try:
                 result = child.wait()
                 # Designer opens each design in its own process; stopping Wine now would end the
-                # others with no save prompt. An interrupted launch still stops everything.
+                # others with no save prompt. Interrupting this wait leaves them running, and Wine
+                # exits by itself after the last one closes.
+                stop_wine = False
                 if designer_running(root):
                     say('Waiting for the other open designs to close')
                     while designer_running(root):
                         time.sleep(1)
-                cancelled = False
+                stop_wine = last_launch(lock)
             finally:
-                if cancelled or last_launch(lock):
+                if stop_wine:
                     subprocess.run([str(server), '-k'], env=env, timeout=30, stdout=log, stderr=log)
                 child.wait(timeout=30)
             if result:

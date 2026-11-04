@@ -168,22 +168,22 @@ enum DataDir {
     /// `--reap` mode: block until `pid` (the launcher-become-wine) exits — clean quit OR crash —
     /// then wait for every other Designer on this install, then tear down. Designer opens each
     /// design in its own process, so stopping Wine at the first exit would end the others with no
-    /// save prompt. One reaper covers all of them: a later launcher's reaper finds the lock held
-    /// and leaves. kqueue/NOTE_EXIT is a precise, race-free wait; if the pid is already gone
-    /// (registration fails with ESRCH), carry on at once.
+    /// save prompt. One reaper works at a time: a later launcher's reaper waits for the lock, so a
+    /// Designer started while the first reaper is finishing still has one. kqueue/NOTE_EXIT is a
+    /// precise, race-free wait; if the pid is already gone (registration fails with ESRCH), carry
+    /// on at once.
     static func reapAfter(pid: pid_t) -> Never {
-        guard takeReaperLock() else { exit(0) }
+        takeReaperLock()
         if pid > 0 { waitForExit(pid: pid) }
         while designerIsRunning() { Thread.sleep(forTimeInterval: 1) }
         teardownWine()
         exit(0)
     }
 
-    /// Held until this process exits. A failed open still reaps: a second reaper is safer than none.
-    private static func takeReaperLock() -> Bool {
-        let fd = open("\(root)/.reaper.lock", O_WRONLY | O_CREAT, 0o600)
-        guard fd >= 0 else { return true }
-        return flock(fd, LOCK_EX | LOCK_NB) == 0
+    /// Held until this process exits. A failed lock still reaps: 2 reapers are safer than none.
+    private static func takeReaperLock() {
+        let fd = open("\(root)/.reaper.lock", O_WRONLY | O_CREAT | O_CLOEXEC, 0o600)
+        if fd >= 0 { flock(fd, LOCK_EX) }
     }
 
     /// True while a Designer on this install is running, or a launcher is about to become one.
