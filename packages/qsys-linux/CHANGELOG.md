@@ -9,6 +9,8 @@
   others ended with no save prompt and lost unsaved work. Wine now stops after the last design
   closes.
 - `qsys-linux launch` works while another design is open. Install and remove still refuse.
+- `qsys-linux launch <design>` with a missing file now says `Design file not found` and names the
+  path, in place of a raw system error. It still exits 1.
 
 ## [0.1.0] - 2026-11-02
 

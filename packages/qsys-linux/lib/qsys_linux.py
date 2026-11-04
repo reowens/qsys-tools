@@ -569,7 +569,9 @@ def launch(args):
         env = environment(root, root / 'prefix')
         argv = [wine, root / 'prefix' / APP_REL / EXE_NAME]
         if args.design:
-            design = Path(args.design).expanduser().resolve(strict=True)
+            design = Path(args.design).expanduser().resolve()
+            if not design.exists():
+                raise RuntimeError(f'Design file not found: {design}')
             argv.append(run([wine.parent / 'winepath', '-w', design], env=env,
                             capture_output=True, text=True, timeout=20).stdout.strip())
         with (root / 'designer.log').open('a') as log:

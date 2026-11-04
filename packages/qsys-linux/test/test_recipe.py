@@ -211,6 +211,23 @@ class RecipeTests(unittest.TestCase):
         self.assertEqual(scan.call_count, 2)
         self.assertEqual(stops, [])
 
+    def test_launch_names_a_missing_design(self):
+        target = self.root / 'managed'
+        with recipe.owned_lock(target, create=True):
+            pass
+        root = self.root.resolve()
+        (root / 'not-a-folder').write_text('')
+        for missing in [root / 'gone.qsys', root / 'gone-folder/a.qsys', root / 'not-a-folder/a.qsys']:
+            with self.subTest(missing=missing), patch.object(recipe, 'manifest'), \
+                    patch.object(recipe, 'display_check'), patch.object(recipe, 'environment', return_value={}), \
+                    patch.object(recipe.subprocess, 'Popen') as start, patch.object(recipe, 'run') as winepath, \
+                    patch('sys.stderr', new_callable=io.StringIO) as stderr:
+                code = recipe.main(['--data-dir', str(target), 'launch', str(missing)])
+                self.assertEqual(code, 1)
+                self.assertEqual(stderr.getvalue(), f'[qsys-linux] ERROR: Design file not found: {missing}\n')
+                start.assert_not_called()
+                winepath.assert_not_called()
+
     def test_only_the_last_launch_stops_wine(self):
         target = self.root / 'managed'
         with recipe.owned_lock(target, create=True):
