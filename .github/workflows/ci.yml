@@ -16,6 +16,10 @@ jobs:
   test:
     name: node ${{ matrix.node }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    # Limits for this job: Ubuntu under 2 minutes and macOS under 4, with no Docker
+    # daemon, vendor files, private designs or large downloads. The timeout stops a
+    # hung test; it is not the time budget.
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       # Lean matrix: Node 22 + 24 on Linux, plus one macOS job for
