@@ -327,6 +327,14 @@ class RecipeTests(unittest.TestCase):
             recipe.remove(argparse.Namespace(data_dir=target, purge=True))
         self.assertFalse(target.exists())
 
+    def test_mutations_run_on_a_system_with_no_proc(self):
+        target = self.managed_install()
+        with patch.object(recipe, 'PROC', self.root / 'no-proc'), \
+                patch.object(recipe, 'integration_paths', return_value=(self.root / 'bin', self.root / 'desktop')):
+            self.assertFalse(recipe.designer_running(target))
+            recipe.remove(argparse.Namespace(data_dir=target, purge=True))
+        self.assertFalse(target.exists())
+
     def ctrl_c_on_the_wait(self, detached):
         """Runs launch as a process and signals its process group as a terminal does. Bash stands in for Designer."""
         target = self.managed_install()

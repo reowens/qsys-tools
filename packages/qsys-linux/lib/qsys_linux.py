@@ -41,6 +41,7 @@ RUNTIMES = [
 HELPER_PACKAGES = ['7zip', 'msitools', 'libmsi-1.0-0', 'libgcab-1.0-0', 'icoutils']
 APP_REL = Path('drive_c/QSC/Q-Sys Designer')
 EXE_NAME = 'Q-Sys Designer.exe'
+PROC = Path('/proc')
 
 
 def say(message):
@@ -539,8 +540,10 @@ def manifest(root):
 
 def designer_running(root):
     """File > Open starts a Designer with only a Windows path, so match this install's binary."""
+    if not PROC.is_dir():
+        return False
     toolchain = f'{root.resolve() / "toolchain"}/'
-    for entry in Path('/proc').iterdir():
+    for entry in PROC.iterdir():
         if not entry.name.isdigit():
             continue
         try:
