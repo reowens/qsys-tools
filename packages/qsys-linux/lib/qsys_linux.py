@@ -210,6 +210,9 @@ def owned_lock(root, create=False, shared=False):
                 output.write('qsys-linux v1\n')
     if not marker.is_file() or marker.read_text() != 'qsys-linux v1\n':
         raise RuntimeError('Missing installation ownership marker')
+    # A design outlives a launch stopped by Ctrl+C, and then nothing holds the lock for it.
+    if not shared and designer_running(root):
+        raise RuntimeError(f'Q-SYS Designer is running from {root}; close every open design, then run this again')
     with (root / '.operation.lock').open('a') as lock:
         try:
             fcntl.flock(lock, (fcntl.LOCK_SH if shared else fcntl.LOCK_EX) | fcntl.LOCK_NB)

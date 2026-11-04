@@ -11,6 +11,9 @@
 - `qsys-linux launch` works while another design is open. Install and remove still refuse.
 - `qsys-linux launch <design>` with a missing file now says `Design file not found` and names the
   path, in place of a raw system error. It still exits 1.
+- `install`, `remove` and `scale` now refuse while any Designer of the installation is running. They
+  relied on a lock that no launch holds after Ctrl+C on the wait for other designs, so `remove --purge`
+  could delete the folder under open designs. A Designer that closed or crashed does not block them.
 
 ## [0.1.0] - 2026-11-02
 

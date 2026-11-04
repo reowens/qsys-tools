@@ -111,10 +111,11 @@ describes. Only 1 design can emulate at a time, which is also QSC's behaviour.
 - **Opening another design:** File > Open and a second `qsys-linux launch <design>` both work while
   a design is open.
 - **Closing a design:** Wine stops only after the last design closes. Until then `qsys-linux launch`
-  stays running and says it is waiting for the other designs. Ctrl+C on that wait leaves the other
-  designs open.
-- **Install and remove:** `install` and `remove` refuse while a `qsys-linux launch` is running. After
-  Ctrl+C on the wait they no longer refuse, so close the remaining designs first.
+  stays running and says it is waiting for the other designs. Ctrl+C on that wait ends `launch`,
+  which does not stop Wine or the other designs.
+- **Install, remove and scale:** `install`, `remove` and `scale` refuse while any Designer of this
+  installation is running, including a design still open after Ctrl+C on the wait, and tell you to
+  close every open design. A Designer that closed or crashed does not block them.
 
 ## Validation and limits
 
