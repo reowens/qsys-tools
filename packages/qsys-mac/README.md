@@ -8,6 +8,9 @@ SHA-256 checksum, mounts it, and delegates to the bundled `qsys-mac` helper.
 The current bootstrapper pins
 [`qsys-mac-installer 0.1.8`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.8)
 with SHA-256 `a33d0fccd2aaf87a24bdbd69318659a8366ce95f59155c74747b1d9ba64ea52e`.
+That DMG uses the older .NET 8 recipe. For Designer 10.5.1, use the
+[0.1.9 DMG](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.9)
+or Homebrew until the bootstrapper moves to it.
 
 You still provide your own Q-SYS Designer Windows installer from QSC.
 

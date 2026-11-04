@@ -16,12 +16,10 @@ provisions a Wine prefix, and emits a `Q-SYS Designer.app`.
 > [`reowens/qsys-tools`](https://github.com/reowens/qsys-tools) (`packages/qsys-mac-installer`),
 > licensed **MIT** (see [Legal & release](#legal--release)).
 
-The source recipe also supports **Designer 10.5.1 / .NET 10.0.14**, provisioned
+The **0.1.9 DMG** supports **Designer 10.5.1 / .NET 10.0.14**. The recipe was provisioned
 and launch-tested in isolation on an M2 Air / macOS 27 with Wine 11.10. It selects
 the runtime from the supplied Designer's metadata and retains .NET 8.0.33 for
-10.4.x installers. The currently published **0.1.8 DMG** still bundles the older
-.NET 8 recipe; use the source build for 10.5.1 until a new DMG is released.
-The Air check verified full MSI assembly, runtime startup, a Designer window,
+10.4.x installers. That check verified full MSI assembly, runtime startup, a Designer window,
 and CEF subprocess startup; interactive editor validation remains on the older
 Mac release and on the Linux 10.5.1 build.
 
@@ -57,11 +55,12 @@ you are done. The installed Designer app and its Application Support data remain
 installer app.
 
 Direct signed-DMG path: download
-[`qsys-mac-installer.dmg`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.8),
+[`qsys-mac-installer.dmg`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.9),
 open `Q-SYS Mac Installer.app`, and drop your Q-SYS Designer installer into the window for a fresh
 install or explicit reinstall.
 
-npm/bootstrapper path:
+npm/bootstrapper path, which still pins the 0.1.8 DMG and its .NET 8 recipe, so it suits Designer
+10.4.x. For Designer 10.5.1, use the 0.1.9 DMG above or Homebrew:
 
 ```sh
 npx qsys-mac install "/path/to/Q-SYS Designer Installer 10.4.0.exe"

@@ -1,12 +1,13 @@
 # qsys-tools
 
 > Open-source tooling for **QSC Q-SYS** audio/video systems — control a Core from
-> your shell, your code, or an AI agent, and run Q-SYS Designer natively on your Mac.
+> your shell, your code, or an AI agent, and run Q-SYS Designer on your Mac or Ubuntu desktop.
 
 [![npm qsys-cli](https://img.shields.io/npm/v/qsys-cli.svg?label=qsys-cli)](https://www.npmjs.com/package/qsys-cli)
 [![npm qsys-qrc](https://img.shields.io/npm/v/qsys-qrc.svg?label=qsys-qrc)](https://www.npmjs.com/package/qsys-qrc)
 [![npm qsys-mcp](https://img.shields.io/npm/v/qsys-mcp.svg?label=qsys-mcp)](https://www.npmjs.com/package/qsys-mcp)
 [![npm qsys-mac](https://img.shields.io/npm/v/qsys-mac.svg?label=qsys-mac)](https://www.npmjs.com/package/qsys-mac)
+[![npm qsys-linux](https://img.shields.io/npm/v/qsys-linux.svg?label=qsys-linux)](https://www.npmjs.com/package/qsys-linux)
 [![node ≥18](https://img.shields.io/badge/node-%E2%89%A518-brightgreen.svg)](https://nodejs.org)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](#licensing)
 
@@ -19,10 +20,10 @@ code, no SDK, no hardware required for development.**
 |---|---|
 | [`qsys-cli`](packages/qsys) | CLI (command: `qsys`) — status, component inventory, get/set controls with ramps, live watch, snapshots |
 | [`qsys-qrc`](packages/qsys-qrc) | TypeScript QRC client — wire framing, change groups, keepalive, transparent auto-reconnect, typed protocol surface |
-| [`qsys-mcp`](packages/qsys-mcp) | [MCP](https://modelcontextprotocol.io) server (`io.github.reowens/qsys-mcp` in the MCP Registry) — 18 tools that let an AI agent inspect and drive a live Q-SYS system |
+| [`qsys-mcp`](packages/qsys-mcp) | [MCP](https://modelcontextprotocol.io) server (`io.github.reowens/qsys-mcp` in the MCP Registry) — 25 tools that let an AI agent inspect and drive a live Q-SYS system |
 | [`qsys-mac`](packages/qsys-mac) | npm bootstrapper (command: `qsys-mac`) — downloads/verifies the signed Q-SYS Mac Installer DMG and delegates to its helper |
 | [`qsys-mac-installer`](packages/qsys-mac-installer) | **Q-SYS Designer for macOS** — signed/notarized BYO-installer wrapper app + DMG source |
-| [`qsys-linux`](packages/qsys-linux) | **Q-SYS Designer for Ubuntu 26.04 x86-64** — per-user Wine/.NET 10 setup and desktop launcher; npm package prepared for first publication |
+| [`qsys-linux`](packages/qsys-linux) | **Q-SYS Designer for Ubuntu 26.04 x86-64** — per-user Wine/.NET 10 setup and desktop launcher (command: `qsys-linux`) |
 
 ## Quick start — shell
 
@@ -107,10 +108,11 @@ The installed Designer app and its Application Support data remain independent o
 Direct DMG path:
 
 ```sh
-open https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.4
+open https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.9
 ```
 
-Or use the npm bootstrapper:
+Or use the npm bootstrapper, which still pins the 0.1.8 DMG and its .NET 8 recipe, so it suits
+Designer 10.4.x. For Designer 10.5.1, use the DMG above or Homebrew:
 
 ```sh
 npx qsys-mac install "/path/to/Q-SYS Designer Installer 10.4.0.exe"
@@ -146,7 +148,7 @@ The signed installer source lives in
 [`packages/qsys-mac-installer`](packages/qsys-mac-installer). It provisions Wine +
 .NET into Application Support and gives you a real Dock/Finder/menu-bar citizen.
 The current signed DMG is
-[`qsys-mac-installer 0.1.4`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.4).
+[`qsys-mac-installer 0.1.9`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.9).
 
 Bonus: Designer's **Emulate mode** serves QRC on `127.0.0.1:1710`, so all of the
 tools above work hardware-free against it — that's how this repo's tooling is
@@ -158,14 +160,18 @@ The initial Linux recipe runs Designer **10.5.1** on **Ubuntu 26.04 x86-64**
 through Wine Staging 11.20 and Windows .NET 10. Supply your own vendor ZIP/EXE:
 
 ```sh
-packages/qsys-linux/qsys-linux install "/path/to/Q-SYS_Designer_Installer_10.5.1.zip"
-~/.local/bin/qsys-linux doctor
-~/.local/bin/qsys-linux launch
+npx qsys-linux install "/path/to/Q-SYS_Designer_Installer_10.5.1.zip"
+npx qsys-linux doctor
+npx qsys-linux launch
 ```
 
 Installation needs an accessible X11/XWayland desktop and 12 GiB free during
 setup. It runs per-user without sudo and adds a **Q-SYS Designer** desktop
 launcher. See [requirements and validation](packages/qsys-linux/README.md).
+
+The source checkout also has a vendor-free Docker test harness, described under
+[Container smoke tests](packages/qsys-linux/README.md#container-smoke-tests). You
+build its image locally; no image is published.
 
 ## No hardware?
 
@@ -214,7 +220,7 @@ pnpm run qsys-mac -- install "/path/to/Q-SYS Designer Installer 10.4.0.exe"
 ## Licensing
 
 The original `qsys-tools` source code is **MIT** licensed, including the QRC packages, the
-`qsys-mac` npm bootstrapper, and the `qsys-mac-installer` wrapper app.
+`qsys-mac` npm bootstrapper, the `qsys-linux` recipe, and the `qsys-mac-installer` wrapper app.
 
 The signed macOS installer DMG is a multi-license binary distribution because it bundles
 redistributable third-party components such as Wine, .NET, p7zip, icoutils, `msiinfo`, and their

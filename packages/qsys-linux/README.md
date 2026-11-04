@@ -7,8 +7,8 @@ It installs per-user without sudo and supplies a `qsys-linux` command and a
 
 This is an independent BYO-installer wrapper. Supply your own Q-SYS ZIP/EXE
 from the vendor; this repository contains no QSC software. The Mac installer
-remains a separate frontend. The `qsys-linux` npm package is prepared for its
-first publication; the source command below works now.
+remains a separate frontend. Install through the `qsys-linux` npm package or from
+this source checkout.
 
 ## Install
 
@@ -28,7 +28,7 @@ packages/qsys-linux/qsys-linux install "/path/to/Q-SYS_Designer_Installer_10.5.1
 ~/.local/bin/qsys-linux launch "/path/to/a design.qsys"
 ```
 
-After the first npm publication, the equivalent entry point will be:
+The equivalent npm entry point is:
 
 ```sh
 npx qsys-linux install "/path/to/Q-SYS_Designer_Installer_10.5.1.zip"

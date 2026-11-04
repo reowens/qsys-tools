@@ -49,9 +49,10 @@ gate publishes nothing:
 access to "Require two-factor authentication and disallow tokens" — OIDC still works.)
 `qsys-mock-core` is `private` and is never published.
 
-`qsys-linux` is prepared at 0.1.0. npm trusted publishing requires the package to
-exist, so 0.1.0 is published once by hand from a tarball built at the merged commit:
-confirm `npm whoami` is the intended owner with 2FA, then run `npm publish <tarball>`.
+`qsys-linux` 0.1.0 was published once by hand, because npm trusted publishing requires
+the package to exist. It came from a tarball built at the merged commit, with `npm whoami`
+confirmed as the owner with 2FA, using `npm publish <tarball>`. npm also created a
+`0.0.0-stage` placeholder, which stays in the version list.
 That version has no build provenance. **Do not push a `qsys-linux-v0.1.0` tag
 afterward:** the workflow would try to publish a version that is already used. When
 the next real version is ready, configure the trusted publisher (repository
