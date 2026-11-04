@@ -102,7 +102,7 @@ async function main(): Promise<void> {
   assert.deepEqual(mock.lastSnapshotLoad(), { Name: 'OtherBank', Bank: 2 }, 'load omits Ramp when not given');
 
   // Mixer.Set* — the wrappers' whole job is wire mapping, so assert the exact method + params.
-  // (The mock records but does not apply the call — crosspoint-grid fidelity is the private moat.)
+  // (The mock records but does not apply the call.)
   await client.mixerSetCrossPointGain('Mixer1', '*', '*', -100, 5); // documented example: -100dB over 5s
   assert.deepEqual(
     mock.lastMixerCall(),

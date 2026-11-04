@@ -283,7 +283,7 @@ export class MockCore {
         return reply(null);
 
       // Mixer.Set* — deliberately thin: record the wire call + ack, no crosspoint-grid
-      // state, no selector expansion, no readback. That fidelity is the private moat.
+      // state, no selector expansion, no readback. The mock only proves the wire mapping.
       case 'Mixer.SetCrossPointGain':
       case 'Mixer.SetCrossPointDelay':
       case 'Mixer.SetCrossPointMute':
@@ -301,7 +301,7 @@ export class MockCore {
         return reply(null);
 
       // LoopPlayer.* — same posture as Mixer: record the wire call + ack, no transport state,
-      // no output-control fidelity, no readback. That fidelity is the private moat.
+      // no output-control fidelity, no readback. The mock only proves the wire mapping.
       case 'LoopPlayer.Start':
       case 'LoopPlayer.Stop':
       case 'LoopPlayer.Cancel':
