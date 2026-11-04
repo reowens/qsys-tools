@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (C) 2026 Robert Owens
 import { spawn } from 'node:child_process';
-import { constants, createReadStream } from 'node:fs';
+import { constants, createReadStream, realpathSync } from 'node:fs';
 import { access, chmod, link, lstat, mkdir, open, readFile, readdir, realpath, stat, statfs, unlink, writeFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { once } from 'node:events';
@@ -705,7 +705,7 @@ export async function runSmoke(options = {}) {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const options = parseArgs(process.argv.slice(2));
     if (options.help) console.log(help);

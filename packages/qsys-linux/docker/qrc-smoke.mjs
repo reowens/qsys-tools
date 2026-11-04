@@ -2,6 +2,7 @@
 // Public client against a local, disposable Designer Emulate instance only.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { mkdir, writeFile, rename } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -126,4 +127,4 @@ export async function main(argv = process.argv.slice(2)) {
   await rename(`${output}.tmp`, output);
   return result.status === 'passed' ? 0 : 1;
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) process.exitCode = await main();
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) process.exitCode = await main();

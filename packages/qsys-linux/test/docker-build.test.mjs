@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { access, copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -178,4 +178,16 @@ if (args.includes('build')) {
   assert.equal(result.digest, 'sha256:' + 'a'.repeat(64));
   assert.equal(result.sourceRevision, sha);
   assert.equal(result.imageId, null);
+});
+
+test('each script runs when started through a symlink, as a macOS temporary path is', async t => {
+  const directory = await scratch(t);
+  const start = async (name, args) => {
+    const link = path.join(directory, name.replaceAll('/', '-'));
+    await symlink(fileURLToPath(new URL(`../${name}`, import.meta.url)), link);
+    return spawnSync(process.execPath, [link, ...args], { encoding: 'utf8' });
+  };
+  assert.match((await start('scripts/docker-build.mjs', ['--help'])).stdout, /docker-build\.mjs/);
+  assert.notEqual((await start('scripts/docker-smoke.mjs', ['--help'])).stdout, '');
+  assert.notEqual((await start('docker/qrc-smoke.mjs', ['--unknown-option'])).status, 0);
 });
