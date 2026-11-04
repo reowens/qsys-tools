@@ -351,8 +351,8 @@ Designer starts the later ones itself. Each shows the Q-SYS Designer name, icon 
 Dock, because the Wine loader's real file is named `Q-SYS Designer` with `wine` as a link to it.
 
 - **Closing a design:** Wine stops only after the last design closes. Until then the launcher's
-  helper stays registered with no Dock tile or menu, so macOS does not report the app as running
-  in the background.
+  helper stays registered with no Dock tile or menu, so macOS marks the app as running in the
+  background for under a second instead of the whole session.
 - **Scripts:** macOS still reports a later design's process as `wine` to `lsappinfo` and System
   Events, so automation has to find a design by its window title. `NSProcessInfo.processName` did
   not change this on macOS 27.2.
