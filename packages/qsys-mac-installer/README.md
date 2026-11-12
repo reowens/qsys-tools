@@ -16,12 +16,13 @@ provisions a Wine prefix, and emits a `Q-SYS Designer.app`.
 > [`reowens/qsys-tools`](https://github.com/reowens/qsys-tools) (`packages/qsys-mac-installer`),
 > licensed **MIT** (see [Legal & release](#legal--release)).
 
-The **0.1.9 DMG** supports **Designer 10.5.1 / .NET 10.0.14**. The recipe was provisioned
-and launch-tested in isolation on an M2 Air / macOS 27 with Wine 11.10. It selects
-the runtime from the supplied Designer's metadata and retains .NET 8.0.33 for
-10.4.x installers. That check verified full MSI assembly, runtime startup, a Designer window,
-and CEF subprocess startup; interactive editor validation remains on the older
-Mac release and on the Linux 10.5.1 build.
+The **0.1.10 DMG** supports **Designer 10.5.1 / .NET 10.0.14**. It selects the runtime from the
+supplied Designer's metadata and retains .NET 8.0.33 for 10.4.x installers. It was installed
+from the signed DMG with the bundled `qsys-mac install` on an M4 Pro / macOS 27.2 and checked on
+screen: Designer started, designs opened from File > Open, closing the first of 2 open designs
+left the other open with its unsaved edit, and closing the last design left no Designer or
+Wine process. Interactive editor validation remains on the older Mac release and on the
+Linux 10.5.1 build.
 
 ---
 
