@@ -43,7 +43,7 @@ gate publishes nothing:
   that tag pattern, and add required reviewers to `mcp-registry`.
 
 **One-time setup (per package, on npmjs.com):** for each of `qsys-qrc`, `qsys-cli`,
-`qsys-mcp`, `qsys-mac`, open `npmjs.com/package/<name>/access` → **Trusted Publishers**
+`qsys-mcp`, `qsys-mac`, `qsys-linux`, open `npmjs.com/package/<name>/access` → **Trusted Publishers**
 → add a **GitHub Actions** publisher: organization/user `reowens`, repository
 `qsys-tools`, workflow filename `publish.yml`. (Optionally set the package's publishing
 access to "Require two-factor authentication and disallow tokens" — OIDC still works.)
@@ -54,11 +54,12 @@ the package to exist. It came from a tarball built at the merged commit, with `n
 confirmed as the owner with 2FA, using `npm publish <tarball>`. npm also created a
 `0.0.0-stage` placeholder, which stays in the version list.
 That version has no build provenance. **Do not push a `qsys-linux-v0.1.0` tag
-afterward:** the workflow would try to publish a version that is already used. When
-the next real version is ready, configure the trusted publisher (repository
-`reowens/qsys-tools`, workflow `publish.yml`, environment `npm-publish`) and release
-it by tag. A new configuration expires unless its first publish succeeds within
-2 days, so configure it just before tagging. Its packed consumer test
+afterward:** the workflow would try to publish a version that is already used. Its
+trusted publisher (repository `reowens/qsys-tools`, workflow `publish.yml`, environment
+`npm-publish`) has been configured since 0.1.1, which was the first version released by tag.
+npm answers a mismatched trusted-publisher entry with `E404 Not Found` on the upload, after
+provenance is already signed; fix the entry on npmjs.com and rerun the failed publish run
+rather than moving the tag. The packed consumer test
 checks that the Python recipe, public MSI/font helpers, and OFL fonts are
 self-contained. The package contains no QSC installer, Wine, or .NET binaries;
 installing the npm package does not provision Designer automatically.
