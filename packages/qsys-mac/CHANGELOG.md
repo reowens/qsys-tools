@@ -6,13 +6,19 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-11-12
+
+### Changed
+
+- `DEFAULT_RELEASE` now points at the `qsys-mac-installer 0.1.10` signed DMG.
+
 ### Fixed
 
-- The next `qsys-mac-installer` DMG fixes a data-loss bug in the launcher. Designer opens
+- The `qsys-mac-installer 0.1.10` DMG fixes a data-loss bug in the launcher. Designer opens
   each design in its own process, and the launcher stopped Wine as soon as the design
   opened first closed, so the other designs ended with no save prompt and lost unsaved
   work. Wine now stops after the last design closes. Installs from 0.1.9 and earlier keep
-  the bug until the DMG ships and `DEFAULT_RELEASE` points at it.
+  the bug until they reinstall from 0.1.10.
 - The same DMG names a design opened from File > Open "Q-SYS Designer" in the Dock instead of
   "wine". Its loader file is renamed to do this, so a firewall rule written for the old path
   needs writing again.
