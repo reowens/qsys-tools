@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.1] - 2026-11-12
 
 ### Fixed
 
@@ -14,6 +14,18 @@
 - `install`, `remove` and `scale` now refuse while any Designer of the installation is running. They
   relied on a lock that no launch holds after Ctrl+C on the wait for other designs, so `remove --purge`
   could delete the folder under open designs. A Designer that closed or crashed does not block them.
+- The desktop shows Designer's own name and icon. Designer's windows were not matched to the menu
+  entry, so GNOME named them `q-sys designer.exe` and showed no Q-SYS icon. The menu entry now names
+  Designer's window class, and `install` copies the icon out of your installed copy of Designer into
+  the data folder. If it cannot read the icon, it warns and uses a generic one. The package itself
+  contains no QSC artwork. `remove` deletes the copied icon. Existing installations get this after
+  running `install` again with the QSC installer.
+- Wine no longer adds desktop entries, file-type handlers or icons to your desktop. Wine's menu
+  builder was turned off only while the Windows folder was first created, so later install steps
+  and every launch registered Wine as the handler for some Windows file types (`.chm`, `.crt`,
+  `.hlp`, `.msp`, `.reg` and `.vbs`). It is now off for every Wine run. `remove` does not delete
+  entries an earlier version created: you can delete any
+  `~/.local/share/applications/wine-extension-*.desktop` that points at your qsys-linux Windows folder.
 
 ## [0.1.0] - 2026-11-02
 

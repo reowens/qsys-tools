@@ -17,6 +17,7 @@ import shutil
 import signal
 import socket
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
@@ -42,6 +43,11 @@ HELPER_PACKAGES = ['7zip', 'msitools', 'libmsi-1.0-0', 'libgcab-1.0-0', 'icoutil
 APP_REL = Path('drive_c/QSC/Q-Sys Designer')
 EXE_NAME = 'Q-Sys Designer.exe'
 PROC = Path('/proc')
+# Wine names each X11 window class after the lowercased executable.
+WM_CLASS = 'q-sys designer.exe'
+ICON_FILE = 'qsys-designer.png'
+ICON_FALLBACK = 'applications-engineering'
+PNG_SIGNATURE = b'\x89PNG\r\n\x1a\n'
 
 
 def say(message):
@@ -156,7 +162,8 @@ def environment(root, prefix):
     env['WINEARCH'] = 'win64'
     env['DOTNET_ROOT'] = env['DOTNET_ROOT_X64'] = r'C:\Program Files\dotnet'
     env['WINEDEBUG'] = os.environ.get('QSYS_WINEDEBUG', '-all')
-    env['WINEDLLOVERRIDES'] = 'mshtml=d'
+    # winemenubuilder would add menu entries, file-type handlers and icons to the user's desktop.
+    env['WINEDLLOVERRIDES'] = 'mshtml=d;winemenubuilder.exe=d'
     env['LIBGL_ALWAYS_SOFTWARE'] = '1'
     # The tested driver is X11, including when the user's desktop runs Wayland.
     env.pop('WAYLAND_DISPLAY', None)
@@ -301,6 +308,97 @@ def desktop_arg(value):
     return '"' + value + '"'
 
 
+def desktop_string(value):
+    if any(ord(c) < 0x20 for c in value):
+        raise RuntimeError('Desktop entry values cannot contain control characters')
+    return value.replace('\\', '\\\\')
+
+
+def executable_icon(data):
+    """Return the largest PNG image of the first icon group in a Windows executable."""
+    def read(layout, offset):
+        if not 0 <= offset <= len(data) - struct.calcsize(layout):
+            raise ValueError('the executable is truncated')
+        return struct.unpack_from(layout, data, offset)
+
+    if data[:2] != b'MZ':
+        raise ValueError('not a Windows executable')
+    header, = read('<I', 0x3c)
+    if data[header:header + 4] != b'PE\0\0':
+        raise ValueError('not a Windows executable')
+    header += 4
+    sections, = read('<H', header + 2)
+    optional_size, = read('<H', header + 16)
+    optional = header + 20
+    magic, = read('<H', optional)
+    if magic not in (0x10b, 0x20b):
+        raise ValueError('unknown executable format')
+    directories = optional + (96 if magic == 0x10b else 112)
+    if read('<I', directories - 4)[0] < 3:
+        raise ValueError('the executable has no resources')
+    resources, = read('<I', directories + 16)
+    table = [read('<IIII', optional + optional_size + 40 * i + 8) for i in range(sections)]
+
+    def offset(address):
+        for virtual_size, virtual_address, raw_size, raw in table:
+            if virtual_address <= address < virtual_address + max(virtual_size, raw_size):
+                return address - virtual_address + raw
+        raise ValueError('a resource lies outside the executable')
+
+    base = offset(resources)
+
+    def directory(target):
+        if not target & 0x80000000:
+            raise ValueError('malformed resource directory')
+        start = base + (target & 0x7fffffff)
+        named, numbered = read('<HH', start + 12)
+        return [read('<II', start + 16 + 8 * i) for i in range(named + numbered)]
+
+    def first_language(target):
+        languages = directory(target)
+        if not languages or languages[0][1] & 0x80000000:
+            raise ValueError('malformed resource entry')
+        address, size = read('<II', base + languages[0][1])
+        start = offset(address)
+        if start + size > len(data):
+            raise ValueError('the executable is truncated')
+        return data[start:start + size]
+
+    types = dict(directory(0x80000000))
+    if 14 not in types or 3 not in types:
+        raise ValueError('the executable has no icon')
+    groups = directory(types[14])
+    if not groups:
+        raise ValueError('the executable has no icon')
+    # Named groups sort first; Windows shows the first group as the program's icon.
+    group = first_language(groups[0][1])
+    icons = dict(directory(types[3]))
+    _, kind, count = struct.unpack_from('<HHH', group) if len(group) >= 6 else (0, 0, 0)
+    if kind != 1 or len(group) < 6 + 14 * count:
+        raise ValueError('malformed icon group')
+    entries = [struct.unpack_from('<BBBBHHIH', group, 6 + 14 * i) for i in range(count)]
+    for width, height, _, _, _, depth, _, number in sorted(
+            entries, key=lambda e: ((e[0] or 256) * (e[1] or 256), e[5]), reverse=True):
+        if number not in icons:
+            continue
+        image = first_language(icons[number])
+        if (image.startswith(PNG_SIGNATURE) and image[12:16] == b'IHDR' and len(image) > 33
+                and all(struct.unpack_from('>II', image, 16))):
+            return image
+    raise ValueError('the executable has no PNG icon')
+
+
+def designer_icon(root):
+    """Copy Designer's own icon from the user's installed copy. The package ships no QSC artwork."""
+    target = root / ICON_FILE
+    try:
+        atomic_text(target, executable_icon((root / 'prefix' / APP_REL / EXE_NAME).read_bytes()))
+        return desktop_string(str(target))
+    except Exception as error:
+        say(f'WARNING: Could not read the Designer icon ({error}); the menu uses a generic icon')
+        return ICON_FALLBACK
+
+
 def integration_paths():
     data = Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local/share'))
     return Path.home() / '.local/bin/qsys-linux', data / 'applications/qsys-designer.desktop'
@@ -310,7 +408,7 @@ def atomic_text(path, text, mode=0o644):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + f'.tmp-{uuid.uuid4().hex}')
     try:
-        temporary.write_text(text)
+        temporary.write_bytes(text) if isinstance(text, bytes) else temporary.write_text(text)
         temporary.chmod(mode)
         temporary.replace(path)
     finally:
@@ -357,7 +455,8 @@ def integration(root, support, fonts):
     atomic_text(desktop, '[Desktop Entry]\nType=Application\nName=Q-SYS Designer\n'
                        'Comment=Q-SYS Designer through Wine\n'
                        f'Exec={desktop_arg(str(launcher))} launch %f\n'
-                       'Icon=applications-engineering\nTerminal=false\nCategories=AudioVideo;Engineering;\n'
+                       f'Icon={designer_icon(root)}\nStartupWMClass={WM_CLASS}\n'
+                       'Terminal=false\nCategories=AudioVideo;Engineering;\n'
                        f'X-Qsys-Linux-Root={root}\n')
     return str(launcher), str(desktop)
 
@@ -673,6 +772,7 @@ def remove(args):
             launcher.unlink()
         if desktop.exists() and f'X-Qsys-Linux-Root={root}\n' in desktop.read_text():
             desktop.unlink()
+        (root / ICON_FILE).unlink(missing_ok=True)
         if args.purge:
             shutil.rmtree(root)
     say(f'Removed managed installation data: {root}' if args.purge else

@@ -5,6 +5,8 @@ import hashlib
 import importlib.util
 import io
 import json
+import struct
+import zlib
 import os
 from pathlib import Path
 import subprocess
@@ -26,6 +28,60 @@ spec.loader.exec_module(recipe)
 DESIGNER = 'C:\\QSC\\Q-Sys Designer\\Q-Sys Designer.exe'
 HELPER = 'C:\\QSC\\Q-Sys Designer\\CefSharp.BrowserSubprocess.exe'
 PRELOADER = 'toolchain/opt/wine-staging/bin/wine64-preloader'
+
+
+def fake_png(width, height):
+    """A valid PNG made here, so no QSC artwork enters the tests."""
+    def chunk(kind, body):
+        return struct.pack('>I', len(body)) + kind + body + struct.pack('>I', zlib.crc32(kind + body))
+    rows = b''.join(b'\0' + b'\x10\x20\x30\xff' * width for _ in range(height))
+    return (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 6, 0, 0, 0))
+            + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b''))
+
+
+def icon_group(*entries):
+    """entries: (width, height, bit depth, icon id); 256 is stored as 0, as Windows does."""
+    return struct.pack('<HHH', 0, 1, len(entries)) + b''.join(
+        struct.pack('<BBBBHHIH', w % 256, h % 256, 0, 0, 1, depth, 0, number) for w, h, depth, number in entries)
+
+
+def fake_executable(icons, groups, magic=0x20b):
+    """A minimal Windows executable whose resource section holds icons {id: bytes} and groups {id: bytes}."""
+    rva, section = 0x1000, bytearray()
+
+    def directory(node):
+        start = len(section)
+        section.extend(struct.pack('<IIHHHH', 0, 0, 0, 0, 0, len(node)))
+        slots = []
+        for key in sorted(node):
+            slots.append((len(section), node[key]))
+            section.extend(struct.pack('<II', key, 0))
+        for slot, child in slots:
+            if isinstance(child, dict):
+                struct.pack_into('<I', section, slot + 4, 0x80000000 | directory(child))
+            else:
+                entry = len(section)
+                section.extend(bytes(16))
+                struct.pack_into('<I', section, slot + 4, entry)
+                struct.pack_into('<II', section, entry, rva + len(section), len(child))
+                section.extend(child)
+        return start
+
+    directory({3: {k: {0x409: v} for k, v in icons.items()}, 14: {k: {0x409: v} for k, v in groups.items()}})
+    directories = 112 if magic == 0x20b else 96
+    optional_size, pe = directories + 16 * 8, 0x40
+    head = bytearray(0x200)
+    head[:2] = b'MZ'
+    struct.pack_into('<I', head, 0x3c, pe)
+    head[pe:pe + 4] = b'PE\0\0'
+    struct.pack_into('<HHIIIHH', head, pe + 4, 0x8664, 1, 0, 0, 0, optional_size, 0x22)
+    struct.pack_into('<H', head, pe + 24, magic)
+    struct.pack_into('<I', head, pe + 24 + directories - 4, 16)
+    struct.pack_into('<II', head, pe + 24 + directories + 16, rva, len(section))
+    table = pe + 24 + optional_size
+    head[table:table + 8] = b'.rsrc\0\0\0'
+    struct.pack_into('<IIII', head, table + 8, len(section), rva, len(section), len(head))
+    return bytes(head) + bytes(section)
 
 
 class RecipeTests(unittest.TestCase):
@@ -540,6 +596,91 @@ pathlib.Path({str(pid_file)!r}).write_text(str(design.pid))
         with self.assertRaises(RuntimeError):
             recipe.remove(argparse.Namespace(data_dir=self.root))
         self.assertTrue((app / recipe.EXE_NAME).exists())
+
+    def test_no_wine_run_registers_desktop_entries_or_file_types(self):
+        env = recipe.environment(self.root, self.root / 'prefix')
+        overrides = dict(part.split('=') for part in env['WINEDLLOVERRIDES'].split(';'))
+        self.assertEqual(overrides, {'mshtml': 'd', 'winemenubuilder.exe': 'd'})
+
+    def install_executable(self, target, data):
+        exe = target / 'prefix' / recipe.APP_REL / recipe.EXE_NAME
+        exe.parent.mkdir(parents=True)
+        exe.write_bytes(data)
+
+    def integrate(self, target):
+        launcher, desktop = self.root / 'bin/qsys-linux', self.root / 'applications/qsys-designer.desktop'
+        support, fonts = recipe.support_paths()
+        output = io.StringIO()
+        with patch.object(recipe, 'integration_paths', return_value=(launcher, desktop)), \
+                contextlib.redirect_stdout(output):
+            recipe.integration(target, support, fonts)
+        return desktop, output.getvalue()
+
+    def test_desktop_entry_uses_designer_icon_and_window_class(self):
+        target = self.root / 'data spaces\\back'
+        with recipe.owned_lock(target, create=True):
+            pass
+        largest = fake_png(48, 48)
+        self.install_executable(target, fake_executable(
+            {1: fake_png(32, 32), 2: struct.pack('<IiiHH', 40, 256, 512, 1, 32) + bytes(64), 3: largest},
+            {1: icon_group((32, 32, 32, 1), (256, 256, 32, 2), (48, 48, 32, 3))}))
+        desktop, output = self.integrate(target)
+        entry = desktop.read_text()
+        # The 256-pixel entry is a bitmap, so the largest PNG is used.
+        self.assertEqual((target / recipe.ICON_FILE).read_bytes(), largest)
+        self.assertIn('\nIcon=' + str(target / recipe.ICON_FILE).replace('\\', '\\\\') + '\n', entry)
+        self.assertIn('\nStartupWMClass=q-sys designer.exe\n', entry)
+        self.assertTrue(entry.endswith(f'X-Qsys-Linux-Root={target}\n'))
+        self.assertNotIn('WARNING', output)
+        with patch.object(recipe, 'integration_paths', return_value=(self.root / 'bin/qsys-linux', desktop)):
+            recipe.remove(argparse.Namespace(data_dir=target, purge=False))
+        self.assertFalse(desktop.exists())
+        self.assertFalse((target / recipe.ICON_FILE).exists())
+        self.assertTrue((target / 'prefix' / recipe.APP_REL / recipe.EXE_NAME).exists())
+
+    def test_the_first_icon_group_is_the_program_icon(self):
+        first, second = fake_png(16, 16), fake_png(64, 64)
+        for magic in (0x20b, 0x10b):
+            with self.subTest(magic=magic):
+                data = fake_executable({1: first, 2: second},
+                                       {7: icon_group((16, 16, 32, 1)), 9: icon_group((64, 64, 32, 2))}, magic)
+                self.assertEqual(recipe.executable_icon(data), first)
+
+    def test_a_damaged_executable_raises_only_value_errors(self):
+        data = fake_executable({1: fake_png(16, 16)}, {1: icon_group((16, 16, 32, 1))})
+        for length in range(len(data)):
+            with self.subTest(length=length), self.assertRaises(ValueError):
+                recipe.executable_icon(data[:length])
+        for icons, groups in [({1: fake_png(16, 16)}, {1: icon_group((16, 16, 32, 2))}),
+                              ({1: b'not an image'}, {1: icon_group((16, 16, 32, 1))}),
+                              ({1: fake_png(16, 16)}, {1: b'\0\0\1\0\5\0'})]:
+            with self.subTest(groups=groups), self.assertRaises(ValueError):
+                recipe.executable_icon(fake_executable(icons, groups))
+
+    def test_a_missing_icon_falls_back_to_a_generic_icon_and_installs(self):
+        for name, data in [('missing', None), ('not windows', b'#!/bin/sh\n'),
+                           ('no png', fake_executable({1: b'bitmap'}, {1: icon_group((16, 16, 32, 1))}))]:
+            with self.subTest(name=name):
+                target = self.root / name
+                with recipe.owned_lock(target, create=True):
+                    pass
+                if data is not None:
+                    self.install_executable(target, data)
+                desktop, output = self.integrate(target)
+                self.assertIn('\nIcon=applications-engineering\n', desktop.read_text())
+                self.assertIn('WARNING: Could not read the Designer icon', output)
+                self.assertFalse((target / recipe.ICON_FILE).exists())
+                desktop.unlink()
+
+    @unittest.skipUnless(shutil.which('desktop-file-validate'), 'desktop-file-utils not installed')
+    def test_the_installed_desktop_entry_passes_the_freedesktop_validator(self):
+        target = self.root / 'data spaces\\back%percent'
+        with recipe.owned_lock(target, create=True):
+            pass
+        self.install_executable(target, fake_executable({1: fake_png(16, 16)}, {1: icon_group((16, 16, 32, 1))}))
+        desktop, _ = self.integrate(target)
+        result = subprocess.run(['desktop-file-validate', str(desktop)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     @unittest.skipUnless(shutil.which('desktop-file-validate'), 'desktop-file-utils not installed')
     def test_desktop_exec_escaping_passes_the_freedesktop_validator(self):
