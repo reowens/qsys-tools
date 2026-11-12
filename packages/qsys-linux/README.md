@@ -132,7 +132,10 @@ that setting for future launches.
 Real Core deployment, USB provisioning, other distributions, ARM Linux, and
 native Wayland mode have not been validated. Broader clipboard, drag/drop, and
 multi-monitor checks remain useful. The installer
-GUI, `.deb` distribution, and extracted application icon are future polish.
+GUI and `.deb` distribution are future polish.
+
+The menu entry uses Designer's own icon, which `install` copies out of your installed Designer;
+the package ships no QSC artwork.
 
 Hermetic checks use no Wine or proprietary payload:
 

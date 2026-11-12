@@ -14,6 +14,12 @@
 - `install`, `remove` and `scale` now refuse while any Designer of the installation is running. They
   relied on a lock that no launch holds after Ctrl+C on the wait for other designs, so `remove --purge`
   could delete the folder under open designs. A Designer that closed or crashed does not block them.
+- The desktop shows Designer's own name and icon. Designer's windows were not matched to the menu
+  entry, so GNOME named them `q-sys designer.exe` and showed no Q-SYS icon. The menu entry now names
+  Designer's window class, and `install` copies the icon out of your installed copy of Designer into
+  the data folder. If it cannot read the icon, it warns and uses a generic one. The package itself
+  contains no QSC artwork. `remove` deletes the copied icon. Existing installations get this after
+  running `install` again with the QSC installer.
 
 ## [0.1.0] - 2026-11-02
 
