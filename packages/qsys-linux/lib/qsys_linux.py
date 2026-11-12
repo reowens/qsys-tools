@@ -41,6 +41,7 @@ RUNTIMES = [
 HELPER_PACKAGES = ['7zip', 'msitools', 'libmsi-1.0-0', 'libgcab-1.0-0', 'icoutils']
 APP_REL = Path('drive_c/QSC/Q-Sys Designer')
 EXE_NAME = 'Q-Sys Designer.exe'
+PROC = Path('/proc')
 
 
 def say(message):
@@ -196,7 +197,7 @@ def extract_runtime(archive_path, prefix):
 
 
 @contextlib.contextmanager
-def owned_lock(root, create=False):
+def owned_lock(root, create=False, shared=False):
     if root.is_symlink() or root.resolve() in [Path('/'), Path.home().resolve()]:
         raise RuntimeError('Refusing an unsafe installation directory')
     marker = root / '.qsys-linux-owned'
@@ -210,12 +211,15 @@ def owned_lock(root, create=False):
                 output.write('qsys-linux v1\n')
     if not marker.is_file() or marker.read_text() != 'qsys-linux v1\n':
         raise RuntimeError('Missing installation ownership marker')
+    # A design outlives a launch stopped by Ctrl+C, and then nothing holds the lock for it.
+    if not shared and designer_running(root):
+        raise RuntimeError(f'Q-SYS Designer is running from {root}; close every open design, then run this again')
     with (root / '.operation.lock').open('a') as lock:
         try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(lock, (fcntl.LOCK_SH if shared else fcntl.LOCK_EX) | fcntl.LOCK_NB)
         except BlockingIOError as error:
             raise RuntimeError('Designer or another installation operation is running; close it first') from error
-        yield
+        yield lock
 
 
 def bootstrap(root, downloads, log):
@@ -534,25 +538,69 @@ def manifest(root):
     return record
 
 
+def designer_running(root):
+    """File > Open starts a Designer with only a Windows path, so match this install's binary."""
+    if not PROC.is_dir():
+        return False
+    toolchain = f'{root.resolve() / "toolchain"}/'
+    for entry in PROC.iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            executable = os.readlink(entry / 'exe')
+            command = (entry / 'cmdline').read_bytes()
+        except OSError:
+            continue
+        if (executable.startswith(toolchain) and EXE_NAME.encode() in command
+                and b'BrowserSubprocess' not in command):
+            return True
+    return False
+
+
+def last_launch(lock):
+    """Only the last launch holding the lock stops Wine; another one may still be starting."""
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        # A failed upgrade drops the shared lock on Linux but keeps it on BSD and macOS. Release
+        # it either way, so the launch that is still waiting can become the last.
+        fcntl.flock(lock, fcntl.LOCK_UN)
+        return False
+    return True
+
+
 def launch(args):
     root = args.data_dir
     manifest(root)
     display_check()
-    with owned_lock(root):
+    with owned_lock(root, shared=True) as lock:
         wine, server = wine_paths(root)
         env = environment(root, root / 'prefix')
         argv = [wine, root / 'prefix' / APP_REL / EXE_NAME]
         if args.design:
-            design = Path(args.design).expanduser().resolve(strict=True)
+            design = Path(args.design).expanduser().resolve()
+            if not design.exists():
+                raise RuntimeError(f'Design file not found: {design}')
             argv.append(run([wine.parent / 'winepath', '-w', design], env=env,
                             capture_output=True, text=True, timeout=20).stdout.strip())
         with (root / 'designer.log').open('a') as log:
             say(f'Launching Designer; log: {root / "designer.log"}')
             child = subprocess.Popen([str(a) for a in argv], env=env, stdout=log, stderr=log)
+            stop_wine = True
             try:
                 result = child.wait()
+                # Designer opens each design in its own process; stopping Wine now would end the
+                # others with no save prompt. Interrupting this wait leaves them running, and Wine
+                # exits by itself after the last one closes.
+                stop_wine = False
+                if designer_running(root):
+                    say('Waiting for the other open designs to close')
+                    while designer_running(root):
+                        time.sleep(1)
+                stop_wine = last_launch(lock)
             finally:
-                subprocess.run([str(server), '-k'], env=env, timeout=30, stdout=log, stderr=log)
+                if stop_wine:
+                    subprocess.run([str(server), '-k'], env=env, timeout=30, stdout=log, stderr=log)
                 child.wait(timeout=30)
             if result:
                 raise RuntimeError(f'Designer exited with status {result}; see {root / "designer.log"}')

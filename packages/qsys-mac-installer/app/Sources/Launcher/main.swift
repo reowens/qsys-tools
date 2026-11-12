@@ -8,8 +8,8 @@ import AppKit
 
 // Hidden reaper mode, spawned by the launch path below just before it execve's into wine. Watches
 // the launcher pid (which becomes wine) and runs `wineserver -k` when it exits — clean quit OR
-// crash — so nothing orphans to PPID 1. Never touches AppKit ⇒ invisible (no Dock tile / menu),
-// so the visible identity stays with the execve'd wine.
+// crash — so nothing orphans to PPID 1. It shows no Dock tile or menu, so the visible identity
+// stays with the execve'd wine.
 // The reaper is spawned ONLY by DataDir.spawnReaper (a detached posix_spawn of ourselves), which
 // sets QSYS_REAPER=1 in the child env and always passes our own positive pid. Honor `--reap` only
 // with that token + a positive pid; otherwise decline without tearing anything down. Without this,

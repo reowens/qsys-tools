@@ -205,6 +205,7 @@ Validate helper parity with:
 scripts/compare-assemble-msi.sh "/path/to/Q-SYS Designer Installer 10.4.0.exe"
 scripts/compare-rename-font-family.sh
 scripts/test-process-cleanup.sh
+scripts/test-reaper.sh
 ```
 
 ## Distribution — signed & notarized `.dmg`
@@ -342,6 +343,22 @@ Every launch token is load-bearing — these were each a debugging session:
 | `LIBGL_ALWAYS_SOFTWARE=1` + `Avalon.Graphics\DisableHWAcceleration=1` | WPF software render. Without it the main window is black (`GL_INVALID_FRAMEBUFFER_OPERATION` from `glBlitFramebuffer`). |
 | **no CEF command-line flags** | CefSharp adds `--no-sandbox` + ANGLE/SwiftShader to its own subprocesses programmatically. Passing them ourselves was redundant **and** broke startup: Designer's design-loader reads `argv[0]` as a design path, so a leading `--no-sandbox` got async-opened as a bogus "design" → an NRE dialog. Pass nothing. |
 | `wine-staging 11.x`, **not** GPTK `wine-7.7` | GPTK's old Wine clears the CLR but then stack-overflows during init (main-thread stack too small). |
+
+### Several designs open at once
+
+Designer opens each design in its own process, and New Design starts another, as QSC's help
+describes. Only 1 design can emulate at a time, which is also QSC's behaviour.
+
+`Q-SYS Designer.app` registers the first process, and Designer starts the later ones itself. Each
+shows the Q-SYS Designer name, icon and app menu in the Dock, because the Wine loader's real file is
+named `Q-SYS Designer` with `wine` as a link to it.
+
+- **Closing a design:** Wine stops only after the last design closes. Until then the launcher's
+  helper stays registered with no Dock tile or menu, so macOS marks the app as running in the
+  background for under a second instead of the whole session.
+- **Scripts:** macOS still reports a later design's process as `wine` to `lsappinfo` and System
+  Events, so automation has to find a design by its window title. `NSProcessInfo.processName` did
+  not change this on macOS 27.2.
 
 ## Rosetta shelf-life clock ⏳
 

@@ -6,6 +6,7 @@
 // under ~/Library/Application Support — NOT inside the .app bundle, because a notarized
 // app can't write into its own signed bundle. The recipe is told this path via WRAP_HOME.
 
+import AppKit
 import Foundation
 
 enum DataDir {
@@ -149,9 +150,8 @@ enum DataDir {
     }
 
     /// Spawn a detached copy of ourselves in `--reap <pid>` mode to watch `pid` (this process, which
-    /// is about to become wine via execve) and reap stragglers when it exits. The reaper never creates
-    /// an NSApplication → it's invisible (no Dock tile, no menu), so the visible identity stays
-    /// entirely with the execve'd wine. This is how we get quit-time teardown without the
+    /// is about to become wine via execve) and reap stragglers when it exits. The reaper shows no Dock
+    /// tile or menu, so the visible identity stays entirely with the execve'd wine. This is how we get quit-time teardown without the
     /// supervise-child Dock-name regression (wine-as-child ⇒ LSDisplayName "wine").
     static func spawnReaper(watching pid: pid_t) {
         guard let me = Bundle.main.executablePath else { return }
@@ -166,12 +166,88 @@ enum DataDir {
     }
 
     /// `--reap` mode: block until `pid` (the launcher-become-wine) exits — clean quit OR crash —
-    /// then `wineserver -k`. kqueue/NOTE_EXIT is a precise, race-free wait; if the pid is already
-    /// gone (registration fails with ESRCH), reap immediately.
+    /// then wait for every other Designer on this install, then tear down. Designer opens each
+    /// design in its own process, so stopping Wine at the first exit would end the others with no
+    /// save prompt. One reaper works at a time: a later launcher's reaper waits for the lock, so a
+    /// Designer started while the first reaper is finishing still has one. kqueue/NOTE_EXIT is a
+    /// precise, race-free wait; if the pid is already gone (registration fails with ESRCH), carry
+    /// on at once.
     static func reapAfter(pid: pid_t) -> Never {
+        takeReaperLock()
         if pid > 0 { waitForExit(pid: pid) }
+        if designerIsRunning() { stayRegisteredUntilLastDesignerExits() }
         teardownWine()
         exit(0)
+    }
+
+    /// macOS 27 reports an app as running in the background once its registered process has gone
+    /// and its other processes remain, and later Designers are not the registered process. Holding
+    /// the registration here, as an accessory with no Dock tile or menu, keeps that report honest.
+    private static func stayRegisteredUntilLastDesignerExits() -> Never {
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        DispatchQueue.global().async {
+            while designerIsRunning() { Thread.sleep(forTimeInterval: 1) }
+            teardownWine()
+            exit(0)
+        }
+        app.run()
+        exit(0)
+    }
+
+    /// Held until this process exits. A failed lock still reaps: 2 reapers are safer than none.
+    private static func takeReaperLock() {
+        let fd = open("\(root)/.reaper.lock", O_WRONLY | O_CREAT | O_CLOEXEC, 0o600)
+        if fd >= 0 { flock(fd, LOCK_EX) }
+    }
+
+    /// True while a Designer on this install is running, or a launcher is about to become one.
+    /// A Designer started from File > Open has only a Windows path in its command line, so the
+    /// install is matched on the executable. An unreadable process list counts as running,
+    /// because tearing down a running Designer loses work and waiting does not.
+    private static func designerIsRunning() -> Bool {
+        let ps = Process()
+        let output = Pipe()
+        ps.executableURL = URL(fileURLWithPath: "/bin/ps")
+        ps.arguments = ["-axww", "-o", "pid=,command="]
+        ps.standardOutput = output
+        ps.standardError = FileHandle.nullDevice
+        guard (try? ps.run()) != nil else { return true }
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        ps.waitUntilExit()
+        guard ps.terminationStatus == 0 else { return true }
+        for line in String(decoding: data, as: UTF8.self).split(separator: "\n") {
+            let fields = line.split(separator: " ", maxSplits: 1)
+            guard fields.count == 2, let pid = pid_t(fields[0]) else { continue }
+            if keepsWineAlive(command: String(fields[1]), executable: executablePath(of: pid)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    static func keepsWineAlive(command: String, executable: String?) -> Bool {
+        guard let executable else { return false }
+        if executable == resolvedLauncher { return !command.contains("--reap") }
+        guard executable.hasPrefix("\(resolvedWineApp)/") else { return false }
+        let lowered = command.lowercased()
+        return lowered.contains("q-sys designer.exe") && !lowered.contains("browsersubprocess")
+    }
+
+    // The kernel reports real paths, so a symlinked home or data folder has to match them too.
+    private static let resolvedLauncher = Bundle.main.executablePath.map(realPath)
+    private static let resolvedWineApp = realPath(wineApp)
+
+    private static func realPath(_ path: String) -> String {
+        guard let real = realpath(path, nil) else { return path }
+        defer { free(real) }
+        return String(cString: real)
+    }
+
+    private static func executablePath(of pid: pid_t) -> String? {
+        var buffer = [CChar](repeating: 0, count: 4096)   // PROC_PIDPATHINFO_MAXSIZE
+        guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
+        return String(cString: buffer)
     }
 
     /// Block until `pid` (the launcher-become-wine) exits — clean quit OR crash. kqueue/NOTE_EXIT is
@@ -214,7 +290,7 @@ enum DataDir {
     }
 
     /// Reap any Wine processes still bound to our prefix (winedevice/CefSharp/wineserver) after
-    /// Designer's process exits — clean quit OR crash. The durable teardown: even a hung Designer
+    /// the last Designer exits — clean quit OR crash. The durable teardown: even a hung Designer
     /// gets killed instead of orphaning to PPID 1. `wineserver -k` signals the whole prefix tree.
     static func teardownWine() {
         if FileManager.default.isExecutableFile(atPath: wineserver) {

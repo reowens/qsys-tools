@@ -1,5 +1,6 @@
 """Hermetic regression checks; no Wine, downloads, QSC installers, or designs."""
 import argparse
+import contextlib
 import hashlib
 import importlib.util
 import io
@@ -8,8 +9,11 @@ import os
 from pathlib import Path
 import subprocess
 import shutil
+import signal
 import tempfile
+import time
 import unittest
+import unittest.mock
 from unittest.mock import patch
 import zipfile
 import sys
@@ -18,6 +22,10 @@ RECIPE = Path(__file__).resolve().parents[1] / 'lib/qsys_linux.py'
 spec = importlib.util.spec_from_file_location('qsys_linux', RECIPE)
 recipe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(recipe)
+
+DESIGNER = 'C:\\QSC\\Q-Sys Designer\\Q-Sys Designer.exe'
+HELPER = 'C:\\QSC\\Q-Sys Designer\\CefSharp.BrowserSubprocess.exe'
+PRELOADER = 'toolchain/opt/wine-staging/bin/wine64-preloader'
 
 
 class RecipeTests(unittest.TestCase):
@@ -155,6 +163,245 @@ class RecipeTests(unittest.TestCase):
         with recipe.owned_lock(target, create=True):
             with self.assertRaisesRegex(RuntimeError, 'running'), recipe.owned_lock(target):
                 pass
+
+    def test_launches_share_the_lock_and_still_block_mutation(self):
+        target = self.root / 'managed'
+        with recipe.owned_lock(target, create=True):
+            pass
+        with recipe.owned_lock(target, shared=True), recipe.owned_lock(target, shared=True):
+            with self.assertRaisesRegex(RuntimeError, 'running'), recipe.owned_lock(target):
+                pass
+        with recipe.owned_lock(target):
+            with self.assertRaisesRegex(RuntimeError, 'running'), recipe.owned_lock(target, shared=True):
+                pass
+
+    def run_launch(self, running, wait=None):
+        target = self.root / 'managed'
+        with recipe.owned_lock(target, create=True):
+            pass
+        child = unittest.mock.Mock()
+        child.wait.side_effect = wait or [0, 0]
+        args = argparse.Namespace(data_dir=target, design=None)
+        with patch.object(recipe, 'manifest'), patch.object(recipe, 'display_check'), \
+                patch.object(recipe, 'environment', return_value={}), \
+                patch.object(recipe, 'designer_running', side_effect=running) as scan, \
+                patch.object(recipe.time, 'sleep'), \
+                patch.object(recipe.subprocess, 'Popen', return_value=child), \
+                patch.object(recipe.subprocess, 'run') as stop:
+            try:
+                recipe.launch(args)
+            except KeyboardInterrupt:
+                pass
+        return scan, [call for call in stop.call_args_list if '-k' in call.args[0]]
+
+    def test_launch_keeps_wine_until_the_other_designs_close(self):
+        order = []
+        def running(_root):
+            order.append('scan')
+            return len(order) < 3
+        scan, stops = self.run_launch(running)
+        self.assertEqual(scan.call_count, 3)
+        self.assertEqual(len(stops), 1)
+
+    def test_launch_stops_wine_at_once_when_it_is_the_only_design(self):
+        scan, stops = self.run_launch([False])
+        self.assertEqual(scan.call_count, 1)
+        self.assertEqual(len(stops), 1)
+
+    def test_interrupted_launch_stops_wine_without_waiting(self):
+        scan, stops = self.run_launch([True], wait=[KeyboardInterrupt(), 0])
+        self.assertEqual(scan.call_count, 0)
+        self.assertEqual(len(stops), 1)
+
+    def test_interrupting_the_wait_leaves_the_other_designs_running(self):
+        scan, stops = self.run_launch([True, KeyboardInterrupt()])
+        self.assertEqual(scan.call_count, 2)
+        self.assertEqual(stops, [])
+
+    def test_launch_names_a_missing_design(self):
+        target = self.root / 'managed'
+        with recipe.owned_lock(target, create=True):
+            pass
+        root = self.root.resolve()
+        (root / 'not-a-folder').write_text('')
+        for missing in [root / 'gone.qsys', root / 'gone-folder/a.qsys', root / 'not-a-folder/a.qsys']:
+            with self.subTest(missing=missing), patch.object(recipe, 'manifest'), \
+                    patch.object(recipe, 'display_check'), patch.object(recipe, 'environment', return_value={}), \
+                    patch.object(recipe.subprocess, 'Popen') as start, patch.object(recipe, 'run') as winepath, \
+                    patch('sys.stderr', new_callable=io.StringIO) as stderr:
+                code = recipe.main(['--data-dir', str(target), 'launch', str(missing)])
+                self.assertEqual(code, 1)
+                self.assertEqual(stderr.getvalue(), f'[qsys-linux] ERROR: Design file not found: {missing}\n')
+                start.assert_not_called()
+                winepath.assert_not_called()
+
+    def test_only_the_last_launch_stops_wine(self):
+        target = self.root / 'managed'
+        with recipe.owned_lock(target, create=True):
+            pass
+        with recipe.owned_lock(target, shared=True) as other, recipe.owned_lock(target, shared=True) as mine:
+            self.assertFalse(recipe.last_launch(mine))
+            self.assertTrue(recipe.last_launch(other))
+
+    def start_process(self, path, name):
+        process = subprocess.Popen([name, '-c', 'read -t 30'], executable=path, stdin=subprocess.PIPE)
+        self.addCleanup(process.stdin.close)
+        self.addCleanup(process.wait)
+        self.addCleanup(process.kill)
+        return process
+
+    def copy_preloader(self, root):
+        binary = root / PRELOADER
+        binary.parent.mkdir(parents=True, exist_ok=True)
+        if not binary.exists():
+            shutil.copy2(shutil.which('bash'), binary)
+        return binary
+
+    @unittest.skipUnless(Path('/proc/self/exe').exists(), 'needs /proc')
+    def test_designer_running_matches_this_install_by_executable(self):
+        root = self.root / 'managed'
+        binary = self.copy_preloader(root)
+        elsewhere = self.root / 'elsewhere/toolchain/preloader'
+        elsewhere.parent.mkdir(parents=True)
+        shutil.copy2(shutil.which('bash'), elsewhere)
+        self.assertFalse(recipe.designer_running(root))
+        other = self.start_process(elsewhere, DESIGNER)
+        helper = self.start_process(binary, HELPER)
+        self.assertFalse(recipe.designer_running(root))
+        other.kill(), helper.kill(), other.wait(), helper.wait()
+        designer = self.start_process(binary, DESIGNER)
+        self.assertTrue(recipe.designer_running(root))
+        designer.kill(), designer.wait()
+        self.assertFalse(recipe.designer_running(root))
+
+    def managed_install(self):
+        target = self.root / 'managed'
+        with recipe.owned_lock(target, create=True):
+            self.seed_prefix(target)
+        return target
+
+    @unittest.skipUnless(Path('/proc/self/exe').exists(), 'needs /proc')
+    def test_an_open_design_refuses_every_mutation_with_no_lock_held(self):
+        target = self.managed_install()
+        desktop = self.root / 'desktop'
+        desktop.write_text(f'X-Qsys-Linux-Root={target}\n')
+        designer = self.start_process(self.copy_preloader(target), DESIGNER)
+        message = f'Q-SYS Designer is running from {target}; close every open design, then run this again'
+        install_args = argparse.Namespace(data_dir=target, installer=str(self.root / 'vendor.zip'), downloads=None, no_integrate=True)
+        with patch.object(recipe, 'integration_paths', return_value=(self.root / 'bin', desktop)), \
+                patch.object(recipe, 'host_check'), patch.object(recipe, 'display_check'), \
+                patch.object(recipe.shutil, 'disk_usage', return_value=unittest.mock.Mock(free=20 * 1024**3)), \
+                patch.object(recipe, 'bootstrap', side_effect=RuntimeError('install went ahead')):
+            for name, command in [('install', lambda: recipe.install(install_args)),
+                                  ('scale', lambda: recipe.scale(argparse.Namespace(data_dir=target, percent=200))),
+                                  ('remove', lambda: recipe.remove(argparse.Namespace(data_dir=target, purge=False))),
+                                  ('purge', lambda: recipe.remove(argparse.Namespace(data_dir=target, purge=True)))]:
+                with self.subTest(command=name):
+                    with self.assertRaises(RuntimeError) as refused:
+                        command()
+                    self.assertEqual(str(refused.exception), message)
+            self.assertTrue(desktop.exists())
+            self.assertEqual((target / 'prefix/user design.qsys').read_text(), 'user design')
+            designer.kill(), designer.wait()
+            recipe.remove(argparse.Namespace(data_dir=target, purge=True))
+        self.assertFalse(target.exists())
+
+    @unittest.skipUnless(Path('/proc/self/exe').exists(), 'needs /proc')
+    def test_an_open_design_is_named_when_a_launch_holds_the_lock(self):
+        target = self.managed_install()
+        self.start_process(self.copy_preloader(target), DESIGNER)
+        with recipe.owned_lock(target, shared=True), self.assertRaisesRegex(RuntimeError, 'close every open design'):
+            with recipe.owned_lock(target):
+                pass
+
+    @unittest.skipUnless(Path('/proc/self/exe').exists(), 'needs /proc')
+    def test_a_crashed_designer_does_not_refuse_remove(self):
+        target = self.managed_install()
+        binary = self.copy_preloader(target)
+        crashed = self.start_process(binary, DESIGNER)
+        crashed.kill()
+        # Left unreaped: a process table entry whose parent has not collected it is not a Designer.
+        os.waitid(os.P_PID, crashed.pid, os.WEXITED | os.WNOWAIT)
+        self.start_process(binary, HELPER)
+        with patch.object(recipe, 'integration_paths', return_value=(self.root / 'bin', self.root / 'desktop')):
+            recipe.remove(argparse.Namespace(data_dir=target, purge=True))
+        self.assertFalse(target.exists())
+
+    def test_mutations_run_on_a_system_with_no_proc(self):
+        target = self.managed_install()
+        with patch.object(recipe, 'PROC', self.root / 'no-proc'), \
+                patch.object(recipe, 'integration_paths', return_value=(self.root / 'bin', self.root / 'desktop')):
+            self.assertFalse(recipe.designer_running(target))
+            recipe.remove(argparse.Namespace(data_dir=target, purge=True))
+        self.assertFalse(target.exists())
+
+    def ctrl_c_on_the_wait(self, detached):
+        """Runs launch as a process and signals its process group as a terminal does. Bash stands in for Designer."""
+        target = self.managed_install()
+        preloader = self.copy_preloader(target)
+        pid_file = self.root / 'designer.pid'
+        wine = target / 'toolchain/opt/wine-staging/bin/wine'
+        wine.write_text(f"""#!{sys.executable}
+import pathlib, subprocess
+design = subprocess.Popen([{DESIGNER!r}, '-c', 'for i in {{1..60}}; do sleep 1; done'], executable={str(preloader)!r},
+                          stdin=subprocess.DEVNULL, start_new_session={detached})
+pathlib.Path({str(pid_file)!r}).write_text(str(design.pid))
+""")
+        wine.chmod(0o755)
+        tools = self.root / 'tools'
+        tools.mkdir()
+        (tools / 'xdpyinfo').write_text('#!/bin/sh\n')
+        (tools / 'xdpyinfo').chmod(0o755)
+        env = dict(os.environ, DISPLAY=':0', HOME=str(self.root), XDG_DATA_HOME=str(self.root / 'data'),
+                   PATH=f'{tools}:{os.environ["PATH"]}')
+        launch = subprocess.Popen([sys.executable, RECIPE, '--data-dir', target, 'launch'], env=env, text=True,
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True,
+                                  preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_DFL))
+        self.addCleanup(launch.kill)
+        for line in launch.stdout:
+            if 'Waiting for the other open designs' in line:
+                break
+        else:
+            self.fail(f'launch never reached the wait: {launch.stderr.read()}')
+        design = int(pid_file.read_text())
+        def end_design():
+            with contextlib.suppress(ProcessLookupError):
+                os.kill(design, signal.SIGKILL)
+        self.addCleanup(end_design)
+        os.killpg(launch.pid, signal.SIGINT)
+        launch.communicate(timeout=30)
+        self.assertEqual(launch.returncode, 130)
+        remove = [sys.executable, RECIPE, '--data-dir', target, 'remove', '--purge']
+        return target, end_design, lambda: subprocess.run([str(a) for a in remove], env=env, capture_output=True, text=True)
+
+    def wait_until_closed(self, target):
+        deadline = time.monotonic() + 10
+        while recipe.designer_running(target):
+            self.assertLess(time.monotonic(), deadline, 'the design did not end')
+            time.sleep(0.05)
+
+    @unittest.skipUnless(Path('/proc/self/exe').exists(), 'needs /proc')
+    def test_remove_refuses_a_design_left_open_after_ctrl_c_on_the_wait(self):
+        target, end_design, remove = self.ctrl_c_on_the_wait(detached=True)
+        self.assertTrue(recipe.designer_running(target))
+        refused = remove()
+        self.assertEqual(refused.returncode, 1, refused.stdout)
+        self.assertEqual(refused.stderr, f'[qsys-linux] ERROR: Q-SYS Designer is running from {target}; '
+                                         'close every open design, then run this again\n')
+        self.assertEqual((target / 'prefix/user design.qsys').read_text(), 'user design')
+        end_design()
+        self.wait_until_closed(target)
+        removed = remove()
+        self.assertEqual(removed.returncode, 0, removed.stderr)
+        self.assertFalse(target.exists())
+
+    @unittest.skipUnless(Path('/proc/self/exe').exists(), 'needs /proc')
+    def test_remove_runs_when_ctrl_c_also_ended_the_design(self):
+        target, _, remove = self.ctrl_c_on_the_wait(detached=False)
+        self.wait_until_closed(target)
+        removed = remove()
+        self.assertEqual(removed.returncode, 0, removed.stderr)
+        self.assertFalse(target.exists())
 
     def test_scale_rejects_invalid_or_unusable_values(self):
         for value in ['0', '10000', 'not-a-number']:
