@@ -6,6 +6,13 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-11-12
+
+### Changed
+
+- `DEFAULT_RELEASE` now points at the `qsys-mac-installer 0.1.11` signed DMG: the 0.1.10 code
+  rebuilt so its binaries carry no home-folder build paths. Behaviour is unchanged.
+
 ## [0.1.10] - 2026-11-12
 
 ### Changed

@@ -6,7 +6,7 @@ or the macOS app payload; it downloads the GitHub Release DMG, verifies its
 SHA-256 checksum, mounts it, and delegates to the bundled `qsys-mac` helper.
 
 The current bootstrapper pins
-[`qsys-mac-installer 0.1.10`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.10)
+[`qsys-mac-installer 0.1.11`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.11)
 with SHA-256 `dca4b0b224afc194ff8ea8658e11505b134ba2c03ff8c484925d9d2a98f64c52`.
 
 You still provide your own Q-SYS Designer Windows installer from QSC.
@@ -55,7 +55,7 @@ open -a "Q-SYS Mac Installer"
 The DMG is cached at:
 
 ```text
-~/Library/Caches/qsys-mac/qsys-mac-installer-0.1.10.dmg
+~/Library/Caches/qsys-mac/qsys-mac-installer-0.1.11.dmg
 ```
 
 If the cached file is missing or does not match the pinned SHA-256 checksum,

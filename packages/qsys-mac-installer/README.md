@@ -16,7 +16,7 @@ provisions a Wine prefix, and emits a `Q-SYS Designer.app`.
 > [`reowens/qsys-tools`](https://github.com/reowens/qsys-tools) (`packages/qsys-mac-installer`),
 > licensed **MIT** (see [Legal & release](#legal--release)).
 
-The **0.1.10 DMG** supports **Designer 10.5.1 / .NET 10.0.14**. It selects the runtime from the
+The **0.1.11 DMG** (0.1.10 rebuilt without home-folder build paths) supports **Designer 10.5.1 / .NET 10.0.14**. It selects the runtime from the
 supplied Designer's metadata and retains .NET 8.0.33 for 10.4.x installers. It was installed
 from the signed DMG with the bundled `qsys-mac install` on an M4 Pro / macOS 27.2 and checked on
 screen: Designer started, designs opened from File > Open, closing the first of 2 open designs
@@ -56,7 +56,7 @@ you are done. The installed Designer app and its Application Support data remain
 installer app.
 
 Direct signed-DMG path: download
-[`qsys-mac-installer.dmg`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.10),
+[`qsys-mac-installer.dmg`](https://github.com/reowens/qsys-tools/releases/tag/qsys-mac-installer-v0.1.11),
 open `Q-SYS Mac Installer.app`, and drop your Q-SYS Designer installer into the window for a fresh
 install or explicit reinstall.
 
