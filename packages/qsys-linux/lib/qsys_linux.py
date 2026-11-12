@@ -162,7 +162,8 @@ def environment(root, prefix):
     env['WINEARCH'] = 'win64'
     env['DOTNET_ROOT'] = env['DOTNET_ROOT_X64'] = r'C:\Program Files\dotnet'
     env['WINEDEBUG'] = os.environ.get('QSYS_WINEDEBUG', '-all')
-    env['WINEDLLOVERRIDES'] = 'mshtml=d'
+    # winemenubuilder would add menu entries, file-type handlers and icons to the user's desktop.
+    env['WINEDLLOVERRIDES'] = 'mshtml=d;winemenubuilder.exe=d'
     env['LIBGL_ALWAYS_SOFTWARE'] = '1'
     # The tested driver is X11, including when the user's desktop runs Wayland.
     env.pop('WAYLAND_DISPLAY', None)

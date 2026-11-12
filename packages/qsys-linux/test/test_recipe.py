@@ -597,6 +597,11 @@ pathlib.Path({str(pid_file)!r}).write_text(str(design.pid))
             recipe.remove(argparse.Namespace(data_dir=self.root))
         self.assertTrue((app / recipe.EXE_NAME).exists())
 
+    def test_no_wine_run_registers_desktop_entries_or_file_types(self):
+        env = recipe.environment(self.root, self.root / 'prefix')
+        overrides = dict(part.split('=') for part in env['WINEDLLOVERRIDES'].split(';'))
+        self.assertEqual(overrides, {'mshtml': 'd', 'winemenubuilder.exe': 'd'})
+
     def install_executable(self, target, data):
         exe = target / 'prefix' / recipe.APP_REL / recipe.EXE_NAME
         exe.parent.mkdir(parents=True)
