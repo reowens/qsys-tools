@@ -117,6 +117,12 @@ say "Embedding the Launcher into the Installer…"
 rm -rf "$INSTALLER/Contents/Resources/Launcher.app"
 /usr/bin/ditto "$LAUNCHER" "$INSTALLER/Contents/Resources/Launcher.app"
 
+# A build under a home folder embeds /Users/<account>/... source paths in the Swift binaries and
+# appmenu.dylib. The public DMG must not carry them, so build from a folder outside /Users.
+home_paths="$(LC_ALL=C grep -rl -a "/Users/" "$INSTALLER" 2>/dev/null || true)"
+[ -z "$home_paths" ] || die "the app embeds /Users/ paths (build outside a home folder, e.g. under /tmp):
+$home_paths"
+
 # --- Step C: sign the Installer inner → outer, NEVER --deep (preserve the nested launcher) ---
 say "Deep-signing the Installer inner → outer (no --deep over the nested launcher)…"
 shopt -s nullglob
