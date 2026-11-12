@@ -562,6 +562,9 @@ def last_launch(lock):
     try:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
+        # A failed upgrade drops the shared lock on Linux but keeps it on BSD and macOS. Release
+        # it either way, so the launch that is still waiting can become the last.
+        fcntl.flock(lock, fcntl.LOCK_UN)
         return False
     return True
 
