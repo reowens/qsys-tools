@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.4] - 2026-11-14
+
+### Fixed
+
+- A new installation follows the desktop's display scale. It used 100% whatever the screen, so on a
+  high-DPI desktop Designer was drawn at half size or smaller until you ran `scale`. `install` now takes
+  the scale the desktop asks X apps for (`Xft.dpi`, which GNOME sets from your display scale; other
+  desktops are untested), rounded to 25%, and says which it used; if it cannot read it, it uses 100% as before. `--scale` still
+  wins, and reinstalling keeps the installation's current scale.
+
+### Added
+
+- `qsys-linux scale auto` (and `install --scale auto`) sets the scale to the desktop's, for example after you change your display
+  scale. `doctor` shows the desktop's scale next to Designer's and suggests `scale auto` when they differ.
+
 ## [0.1.3] - 2026-11-14
 
 ### Documentation

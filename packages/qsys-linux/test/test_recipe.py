@@ -556,6 +556,44 @@ pathlib.Path({str(pid_file)!r}).write_text(str(design.pid))
             recipe.fit_saved_window(self.root, record)
         self.assertEqual(self.window(prefs)['WindowState'], 'Maximized')
 
+    def test_the_desktop_scale_comes_from_xft_dpi(self):
+        gnome = 'RESOURCE_MANAGER(STRING) = "*customization:\\t-color\\nXcursor.size:\\t48\\nXft.antialias:\\t1\\nXft.dpi:\\t192\\nXft.hinting:\\t1\\n"'
+        self.assertEqual(recipe.xft_scale(gnome), 200)
+        for dpi, percent in [('96', 100), ('120', 125), ('144', 150), ('168', 175), ('110', 125), ('72', 75), ('600', 400)]:
+            with self.subTest(dpi=dpi):
+                self.assertEqual(recipe.xft_scale(f'Xft.dpi:\t{dpi}\n'), percent)
+        for unreadable in ['', 'RESOURCE_MANAGER:  not found.', 'Xft.dpi:\t0\n', 'Xft.hinting:\t1\n']:
+            with self.subTest(text=unreadable):
+                self.assertIsNone(recipe.xft_scale(unreadable))
+        with patch.object(recipe, 'run', side_effect=FileNotFoundError('xprop')):
+            self.assertIsNone(recipe.desktop_scale())
+
+    def test_install_takes_the_desktop_scale_only_for_a_new_installation(self):
+        detect = unittest.mock.Mock(return_value=200)
+        self.assertEqual(recipe.install_scale(150, {'scale_percent': 100}, detect), (150, 'chosen'))
+        self.assertEqual(recipe.install_scale(None, {'scale_percent': 125}, detect), (125, 'chosen'))
+        self.assertEqual(recipe.install_scale(None, {'scale_percent': 200, 'scale_source': 'desktop'}, detect), (200, 'desktop'))
+        detect.assert_not_called()
+        self.assertEqual(recipe.install_scale(None, {}, detect), (200, 'desktop'))
+        self.assertEqual(recipe.install_scale(None, {}, lambda: None), (100, 'default'))
+
+    def test_scale_auto_needs_a_readable_desktop_scale(self):
+        self.assertEqual(recipe.scale_percent('auto'), 'auto')
+        args = argparse.Namespace(data_dir=self.root / 'managed', percent='auto')
+        with patch.object(recipe, 'desktop_scale', return_value=None), self.assertRaisesRegex(RuntimeError, 'desktop scale'):
+            recipe.scale(args)
+        setup = argparse.Namespace(data_dir=self.root / 'managed', scale='auto', installer='unused.zip')
+        with patch.object(recipe, 'host_check'), patch.object(recipe, 'display_check'), \
+                patch.object(recipe, 'desktop_scale', return_value=None), self.assertRaisesRegex(RuntimeError, 'desktop scale'):
+            recipe.install(setup)
+        missing = (self.root / 'no-support', self.root / 'no-fonts')
+        setup.scale = 'auto'
+        with patch.object(recipe, 'host_check'), patch.object(recipe, 'display_check'), \
+                patch.object(recipe, 'support_paths', return_value=missing), \
+                patch.object(recipe, 'desktop_scale', return_value=175), self.assertRaisesRegex(RuntimeError, 'support files'):
+            recipe.install(setup)  # stops at the support-file check, after resolving the scale
+        self.assertEqual(setup.scale, 175)
+
     def test_scale_rejects_invalid_or_unusable_values(self):
         for value in ['0', '10000', 'not-a-number']:
             with self.assertRaises(argparse.ArgumentTypeError):
