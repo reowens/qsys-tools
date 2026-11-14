@@ -87,7 +87,8 @@ can reuse checksum-verified Wine/.NET downloads while developing the recipe.
 ```sh
 qsys-linux status           # recorded installation versions and checksums
 qsys-linux doctor           # display, Wine, runtimes, and real loopback check
-qsys-linux scale 200        # 200% UI scaling for a high-DPI screen; close Designer first
+qsys-linux scale auto       # match the desktop's display scale; close Designer first
+qsys-linux scale 200        # or set a percentage yourself
 qsys-linux launch [design]  # logs output and reaps this prefix's Wine processes on exit
 qsys-linux remove           # removes desktop/convenience launchers; keeps installed data
 qsys-linux remove --purge   # also deletes installed data, user files, and retained prefixes
@@ -100,7 +101,12 @@ payload. After validation, it installs that prefix and retains the full previous
 one as `prefix.previous-<timestamp>-<id>` for recovery. Failed installation or
 launcher handoff restores the previous prefix. Retained prefixes consume disk
 space; remove a particular backup yourself once you no longer need it.
-UI scale is preserved on reinstall, or set it during setup with `--scale 200`.
+A new installation takes its UI scale from the desktop: the `Xft.dpi` value the
+desktop publishes to X apps (192 dpi is 200%), rounded to 25%, or 100% if it cannot
+be read. This was checked on Ubuntu GNOME; other desktops are expected to work the
+same way but are untested. Set it during setup with `--scale 200` or `--scale auto`.
+Reinstalling keeps the installation's current scale. `doctor` shows the desktop's
+scale next to Designer's; after changing your display scale, run `qsys-linux scale auto`.
 Desktop launches use support files copied into the data directory, so they
 survive expiry of an `npx` cache. A global npm bin symlink is preserved.
 

@@ -526,6 +526,10 @@ def commit_prefix(root, stage, integrate):
 def install(args):
     host_check()
     display_check()
+    if getattr(args, 'scale', None) == 'auto':
+        args.scale = desktop_scale()
+        if not args.scale:
+            raise RuntimeError('Cannot read the desktop scale (Xft.dpi); give --scale a percentage such as 150 or 200')
     source = Path(args.installer).expanduser().resolve()
     root = args.data_dir
     support, fonts = support_paths()
@@ -601,14 +605,16 @@ def install(args):
                 frameworks = configuration['runtimeOptions']['frameworks']
                 if any(not f['version'].startswith('10.') for f in frameworks):
                     raise RuntimeError('This Designer version requires a different .NET runtime recipe')
-                percent = args.scale if args.scale is not None else (
-                    old_record.get('scale_percent', 100))
+                percent, scale_source = install_scale(args.scale, old_record, desktop_scale)
+                say(f'UI scale: {percent}%' + {'desktop': ' (from the desktop)', 'default': ' (the desktop scale could not be read)'}
+                    .get(scale_source, ''))
                 if old_record:
                     rescale_window(stage, old_record.get('scale_percent', 100), percent)
                 registry = write_tweaks(stage, scratch, fonts, support, round(96 * percent / 100))
                 run([wine, 'regedit', '/S', registry], env=env, timeout=30, stdout=log, stderr=log)
                 manifest = {'schema': SCHEMA, 'designer': properties.get('ProductVersion', 'unknown'),
                             'wine': WINE_VERSION, 'dotnet': DOTNET_VERSION, 'scale_percent': percent,
+                            'scale_source': scale_source,
                             'dotnet_source': 'win-x64-zip',
                             'dotnet_archives': [{'url': url, 'sha512': pin} for url, _, pin in RUNTIMES],
                             'installer_sha256': digest(installer), 'source_sha256': digest(source),
@@ -810,7 +816,9 @@ def doctor(args):
     say('X11 display: accessible')
     wine, _ = wine_paths(root)
     say('Wine: ' + run([wine, '--version'], capture_output=True, text=True).stdout.strip())
-    say(f'UI scale: {manifest(root).get("scale_percent", 100)}%')
+    percent, desktop = manifest(root).get('scale_percent', 100), desktop_scale()
+    say(f'UI scale: {percent}%' + (f'; the desktop asks for {desktop}%' if desktop else '; the desktop scale could not be read')
+        + ('; run "qsys-linux scale auto" to match it' if desktop and desktop != percent else ''))
     say(f'Free space: {shutil.disk_usage(root).free / 1024**3:.1f} GiB')
     say(f'Logs: {root / "install.log"}, {root / "designer.log"}')
     with socket.socket() as listener:
@@ -827,8 +835,41 @@ def doctor(args):
         say(f'{framework}: {DOTNET_VERSION}')
 
 
+def xft_scale(resources):
+    """The UI scale the desktop asks X apps for, from its Xft.dpi resource, as a percentage in steps of 25."""
+    match = re.search(r'Xft\.dpi:(?:\\t|\s)*([0-9]+(?:\.[0-9]+)?)', resources)
+    if not match or float(match.group(1)) <= 0:
+        return None
+    return min(400, max(75, round(float(match.group(1)) / 96 * 4) * 25))
+
+
+def desktop_scale():
+    """GNOME and KDE publish their display scale to X apps as Xft.dpi; None when it cannot be read."""
+    try:
+        resources = run(['xprop', '-root', 'RESOURCE_MANAGER'], capture_output=True, text=True, timeout=10).stdout
+    except (subprocess.SubprocessError, OSError):
+        return None
+    return xft_scale(resources)
+
+
+def install_scale(chosen, old_record, detect):
+    """--scale, then the scale this installation already uses, then the desktop's, then 100%."""
+    if chosen is not None:
+        return chosen, 'chosen'
+    if old_record:
+        return old_record.get('scale_percent', 100), old_record.get('scale_source', 'chosen')
+    detected = detect()
+    return (detected, 'desktop') if detected else (100, 'default')
+
+
 def scale(args):
     root = args.data_dir
+    source = 'chosen'
+    if args.percent == 'auto':
+        args.percent = desktop_scale()
+        if not args.percent:
+            raise RuntimeError('Cannot read the desktop scale (Xft.dpi); give a percentage such as 150 or 200')
+        source = 'desktop'
     with owned_lock(root):
         record = manifest(root)
         env = environment(root, root / 'prefix')
@@ -842,6 +883,7 @@ def scale(args):
             run([server, '-w'], env=env, timeout=30, stdout=subprocess.DEVNULL)
         old_percent = record.get('scale_percent', 100)
         record['scale_percent'] = args.percent
+        record['scale_source'] = source
         temporary = root / 'prefix/.qsys-linux-prefix.tmp'
         temporary.write_text(json.dumps(record, indent=2) + '\n')
         temporary.replace(root / 'prefix/.qsys-linux-prefix')
@@ -850,6 +892,8 @@ def scale(args):
 
 
 def scale_percent(value):
+    if value == 'auto':
+        return value
     try:
         percent = int(value)
     except ValueError as error:
@@ -889,10 +933,10 @@ def main(argv=None):
     setup.add_argument('installer')
     setup.add_argument('--downloads', help='Reuse an explicit scratch download directory (checksums verified)')
     setup.add_argument('--no-integrate', action='store_true', help='Skip desktop and ~/.local/bin launchers')
-    setup.add_argument('--scale', type=scale_percent, help='UI scale percentage; defaults to the previous setting or 100')
+    setup.add_argument('--scale', type=scale_percent, help="UI scale percentage; defaults to the installation's current scale, else the desktop's (Xft.dpi), else 100")
     start = commands.add_parser('launch', help='Launch Designer, optionally opening a design')
     start.add_argument('design', nargs='?')
-    zoom = commands.add_parser('scale', help='Set UI scale for HiDPI screens (close Designer first)')
+    zoom = commands.add_parser('scale', help="Set UI scale, or 'auto' for the desktop's (close Designer first)")
     zoom.add_argument('percent', type=scale_percent)
     commands.add_parser('remove').add_argument('--purge', action='store_true', help='Also delete all installed data, user files, and retained prefixes')
     for name in ['status', 'doctor']:

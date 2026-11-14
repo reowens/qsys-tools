@@ -1,6 +1,6 @@
 {
   "name": "qsys-linux",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Per-user Q-SYS Designer installer and launcher for Ubuntu Linux, using Wine and your own QSC installer.",
   "type": "module",
   "bin": { "qsys-linux": "bin/qsys-linux.mjs" },
