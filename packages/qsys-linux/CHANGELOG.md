@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.3] - 2026-11-14
+
+### Documentation
+
+- The README says how to update: run `install` again with the same QSC ZIP. The menu entry and
+  `~/.local/bin/qsys-linux` run the copy that `install` placed in the installation, so a newer
+  package reaches them only through `install`; the 0.1.2 notes wrongly said no reinstall was needed.
+
 ## [0.1.2] - 2026-11-13
 
 ### Fixed
