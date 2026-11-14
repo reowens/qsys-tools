@@ -240,6 +240,7 @@ class RecipeTests(unittest.TestCase):
         args = argparse.Namespace(data_dir=target, design=None)
         with patch.object(recipe, 'manifest'), patch.object(recipe, 'display_check'), \
                 patch.object(recipe, 'environment', return_value={}), \
+                patch.object(recipe, 'fit_saved_window'), \
                 patch.object(recipe, 'designer_running', side_effect=running) as scan, \
                 patch.object(recipe.time, 'sleep'), \
                 patch.object(recipe.subprocess, 'Popen', return_value=child), \
@@ -458,6 +459,102 @@ pathlib.Path({str(pid_file)!r}).write_text(str(design.pid))
         removed = remove()
         self.assertEqual(removed.returncode, 0, removed.stderr)
         self.assertFalse(target.exists())
+
+    def saved_window(self, width, height, left, top, state='Normal', user='someone'):
+        """A hand-made Prefs.xml in Designer's layout and CRLF endings, holding a saved main window."""
+        def entry(kind, key, value):
+            return f'    <{kind}>\r\n      <key>{key}</key>\r\n      <data>{value}</data>\r\n    </{kind}>\r\n'
+        prefs = self.root / 'prefix/drive_c/users' / user / 'AppData/Local/QSC/Q-Sys Designer/Prefs.xml'
+        prefs.parent.mkdir(parents=True, exist_ok=True)
+        prefs.write_bytes(('<?xml version="1.0" encoding="utf-8"?>\r\n<Data>\r\n  <data>\r\n'
+                           + entry('IntEntry', 'ApplicationScale', 0)
+                           + entry('DoubleEntry', 'mainWindow_Width', width)
+                           + entry('DoubleEntry', 'mainWindow_Height', height)
+                           + entry('DoubleEntry', 'mainWindow_Left', left)
+                           + entry('DoubleEntry', 'mainWindow_Top', top)
+                           + entry('StringEntry', 'mainWindow_WindowState', state)
+                           + '  </data>\r\n</Data>').encode())
+        return prefs
+
+    def window(self, prefs):
+        return recipe.read_window(prefs.read_bytes())
+
+    def test_a_scale_change_keeps_the_saved_window_the_same_size_on_screen(self):
+        prefs = self.saved_window(1500, 1000, 100, 100)
+        recipe.rescale_window(self.root / 'prefix', 100, 200)
+        self.assertEqual(self.window(prefs), {'Width': 750, 'Height': 500, 'Left': 50, 'Top': 50, 'WindowState': 'Normal'})
+        recipe.rescale_window(self.root / 'prefix', 200, 150)
+        self.assertEqual(self.window(prefs), {'Width': 1000, 'Height': 667, 'Left': 67, 'Top': 67, 'WindowState': 'Normal'})
+        text = prefs.read_bytes()
+        self.assertIn(b'<key>ApplicationScale</key>\r\n      <data>0</data>', text)
+        self.assertNotIn(b'\n', text.replace(b'\r\n', b''))
+        self.assertEqual(list(prefs.parent.iterdir()), [prefs])
+
+    def test_the_same_scale_leaves_the_saved_window_alone(self):
+        prefs = self.saved_window(1500, 1000, 100, 100)
+        before = prefs.read_bytes()
+        recipe.rescale_window(self.root / 'prefix', 200, 200)
+        self.assertEqual(prefs.read_bytes(), before)
+
+    def test_a_window_saved_at_the_screen_size_opens_maximized(self):
+        # At 200% on a 6144x3456 screen Designer saved 3072x1728, which Wine reopens fullscreen.
+        prefs = self.saved_window(3072, 1728, 0, 0)
+        recipe.fit_window(self.root / 'prefix', 200, (6144, 3456))
+        self.assertEqual(self.window(prefs), {'Width': 2304, 'Height': 1296, 'Left': 384, 'Top': 216,
+                                              'WindowState': 'Maximized'})
+
+    def test_a_window_that_fits_or_is_maximized_is_left_alone(self):
+        for width, height, state in [(960, 1080, 'Normal'), (3072, 1000, 'Normal'), (3072, 1728, 'Maximized')]:
+            with self.subTest(width=width, height=height, state=state):
+                prefs = self.saved_window(width, height, 0, 0, state)
+                before = prefs.read_bytes()
+                recipe.fit_window(self.root / 'prefix', 200, (6144, 3456))
+                self.assertEqual(prefs.read_bytes(), before)
+
+    def test_unreadable_saved_windows_are_left_alone(self):
+        prefs = self.saved_window(3072, 1728, 0, 0)
+        damaged = {
+            'missing': prefs.read_bytes().replace(b'mainWindow_Top', b'otherWindow_Top'),
+            'twice': prefs.read_bytes().replace(b'</data>\r\n</Data>',
+                                                b'<DoubleEntry><key>mainWindow_Width</key><data>1</data></DoubleEntry></data>\r\n</Data>'),
+            'not a number': prefs.read_bytes().replace(b'<data>3072</data>', b'<data>wide</data>'),
+        }
+        for name, data in damaged.items():
+            with self.subTest(name=name):
+                prefs.write_bytes(data)
+                recipe.fit_window(self.root / 'prefix', 200, (6144, 3456))
+                recipe.rescale_window(self.root / 'prefix', 100, 200)
+                self.assertEqual(prefs.read_bytes(), data)
+        prefs.unlink()
+        recipe.fit_window(self.root / 'prefix', 200, (6144, 3456))
+        recipe.rescale_window(self.root / 'prefix', 100, 200)
+        self.assertFalse(prefs.exists())
+
+    def test_a_saved_window_that_cannot_be_written_does_not_stop_a_launch(self):
+        prefs = self.saved_window(3072, 1728, 0, 0)
+        with patch.object(Path, 'replace', side_effect=PermissionError('read-only')), \
+                patch('sys.stdout', new_callable=io.StringIO) as output:
+            recipe.fit_window(self.root / 'prefix', 200, (6144, 3456))
+        self.assertIn('Left the saved Designer window unchanged', output.getvalue())
+        self.assertEqual(self.window(prefs)['WindowState'], 'Normal')
+        self.assertEqual(list(prefs.parent.iterdir()), [prefs])
+
+    def test_launch_fits_the_window_only_before_the_first_design(self):
+        prefs = self.saved_window(3072, 1728, 0, 0)
+        record = {'scale_percent': 200}
+        screen = 'screen #0:\n  dimensions:    6144x3456 pixels (1625x914 millimeters)\n'
+        with patch.object(recipe, 'designer_running', return_value=True), patch.object(recipe, 'run') as probe:
+            recipe.fit_saved_window(self.root, record)
+        probe.assert_not_called()
+        self.assertEqual(self.window(prefs)['WindowState'], 'Normal')
+        with patch.object(recipe, 'designer_running', return_value=False), \
+                patch.object(recipe, 'run', side_effect=subprocess.TimeoutExpired('xdpyinfo', 10)):
+            recipe.fit_saved_window(self.root, record)
+        self.assertEqual(self.window(prefs)['WindowState'], 'Normal')
+        with patch.object(recipe, 'designer_running', return_value=False), \
+                patch.object(recipe, 'run', return_value=subprocess.CompletedProcess([], 0, screen, '')):
+            recipe.fit_saved_window(self.root, record)
+        self.assertEqual(self.window(prefs)['WindowState'], 'Maximized')
 
     def test_scale_rejects_invalid_or_unusable_values(self):
         for value in ['0', '10000', 'not-a-number']:

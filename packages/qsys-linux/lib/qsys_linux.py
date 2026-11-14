@@ -603,6 +603,8 @@ def install(args):
                     raise RuntimeError('This Designer version requires a different .NET runtime recipe')
                 percent = args.scale if args.scale is not None else (
                     old_record.get('scale_percent', 100))
+                if old_record:
+                    rescale_window(stage, old_record.get('scale_percent', 100), percent)
                 registry = write_tweaks(stage, scratch, fonts, support, round(96 * percent / 100))
                 run([wine, 'regedit', '/S', registry], env=env, timeout=30, stdout=log, stderr=log)
                 manifest = {'schema': SCHEMA, 'designer': properties.get('ProductVersion', 'unknown'),
@@ -635,6 +637,96 @@ def manifest(root):
     if record.get('schema') != SCHEMA or not (root / 'prefix' / APP_REL / EXE_NAME).is_file():
         raise RuntimeError('The installation is incomplete or uses an incompatible recipe; reinstall')
     return record
+
+
+# Designer saves its main window in Prefs.xml in Windows logical units, which the UI scale multiplies.
+WINDOW_KEYS = ('Width', 'Height', 'Left', 'Top', 'WindowState')
+
+
+def window_prefs(prefix):
+    return sorted((prefix / 'drive_c/users').glob('*/AppData/Local/QSC/Q-Sys Designer/Prefs.xml'))
+
+
+def window_field(key):
+    return re.compile(rb'(<key>mainWindow_' + key.encode() + rb'</key>\s*<data>)([^<]*)(</data>)')
+
+
+def read_window(data):
+    """The saved main window, or None unless each field appears exactly once and the numbers parse."""
+    window = {}
+    for key in WINDOW_KEYS:
+        found = window_field(key).findall(data)
+        if len(found) != 1:
+            return None
+        window[key] = found[0][1].decode('ascii', 'replace').strip()
+    try:
+        return {**{key: float(window[key]) for key in WINDOW_KEYS[:4]}, 'WindowState': window['WindowState']}
+    except ValueError:
+        return None
+
+
+def change_window(prefix, change):
+    """Apply change(window) -> {key: value} to each saved window, editing only those values in place."""
+    for path in window_prefs(prefix):
+        temporary = path.with_name(path.name + '.qsys-linux.tmp')
+        try:
+            data = path.read_bytes()
+            window = read_window(data)
+            changes = change(window) if window else None
+            if not changes:
+                continue
+            for key, value in changes.items():
+                text = str(value).encode()
+                data = window_field(key).sub(lambda match: match.group(1) + text + match.group(3), data)
+            temporary.write_bytes(data)
+            temporary.replace(path)
+        except OSError as error:
+            temporary.unlink(missing_ok=True)
+            say(f'Left the saved Designer window unchanged: {error}')
+
+
+def rescale_window(prefix, old_percent, new_percent):
+    """Keep the saved window the same size on screen when the UI scale changes."""
+    if old_percent == new_percent:
+        return
+    ratio = old_percent / new_percent
+    change_window(prefix, lambda window: {key: round(window[key] * ratio) for key in WINDOW_KEYS[:4]})
+
+
+def screen_size():
+    output = run(['xdpyinfo'], capture_output=True, text=True, timeout=10).stdout
+    match = re.search(r'dimensions:\s+(\d+)x(\d+) pixels', output)
+    return (int(match.group(1)), int(match.group(2))) if match else None
+
+
+def fit_window(prefix, percent, screen):
+    """A normal window saved at the screen's size or larger reopens fullscreen under Wine, over the desktop's
+    own bars, and then saves that size again. Open it maximized instead. On several monitors the X screen
+    spans them all, so this only catches a window larger than all of them together."""
+    width, height = screen
+    ratio = percent / 100
+
+    def change(window):
+        if window['WindowState'] != 'Normal':
+            return None
+        if window['Width'] * ratio < width or window['Height'] * ratio < height:
+            return None
+        return {'Width': round(width * 0.75 / ratio), 'Height': round(height * 0.75 / ratio),
+                'Left': round(width * 0.125 / ratio), 'Top': round(height * 0.125 / ratio),
+                'WindowState': 'Maximized'}
+    change_window(prefix, change)
+
+
+def fit_saved_window(root, record):
+    # Every open design shares Prefs.xml and writes it on close, so change it only before the first one.
+    if designer_running(root):
+        return
+    try:
+        screen = screen_size()
+    except (subprocess.SubprocessError, OSError):
+        return
+    if screen:
+        fit_window(root / 'prefix', record.get('scale_percent', 100), screen)
 
 
 def designer_running(root):
@@ -670,7 +762,7 @@ def last_launch(lock):
 
 def launch(args):
     root = args.data_dir
-    manifest(root)
+    record = manifest(root)
     display_check()
     with owned_lock(root, shared=True) as lock:
         wine, server = wine_paths(root)
@@ -682,6 +774,7 @@ def launch(args):
                 raise RuntimeError(f'Design file not found: {design}')
             argv.append(run([wine.parent / 'winepath', '-w', design], env=env,
                             capture_output=True, text=True, timeout=20).stdout.strip())
+        fit_saved_window(root, record)
         with (root / 'designer.log').open('a') as log:
             say(f'Launching Designer; log: {root / "designer.log"}')
             child = subprocess.Popen([str(a) for a in argv], env=env, stdout=log, stderr=log)
@@ -747,10 +840,12 @@ def scale(args):
         finally:
             subprocess.run([str(server), '-k'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             run([server, '-w'], env=env, timeout=30, stdout=subprocess.DEVNULL)
+        old_percent = record.get('scale_percent', 100)
         record['scale_percent'] = args.percent
         temporary = root / 'prefix/.qsys-linux-prefix.tmp'
         temporary.write_text(json.dumps(record, indent=2) + '\n')
         temporary.replace(root / 'prefix/.qsys-linux-prefix')
+        rescale_window(root / 'prefix', old_percent, args.percent)
     say(f'UI scale set to {args.percent}%; launch Designer to use it')
 
 
