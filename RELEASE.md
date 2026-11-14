@@ -71,6 +71,13 @@ publishing. Build the tarball from that merged/tagged commit with
 `pnpm --filter qsys-linux pack`; inspect its contents and record its SHA-256
 in the release notes. Reserve `qsys-linux-v*` for tag-driven npm releases after 0.1.0.
 
+**A release is finished only when the new version is installed and verified on the
+maintainer's own machine.** A publish without that install is a failed release. The
+maintainer's release command installs the exact candidate tarball and verifies it
+(installed files match the candidate, `doctor` passes, Designer starts and closes
+through the installed launcher) *before* the tag is pushed, then checks that npm
+serves the same files. A package with no install step defined is not released.
+
 To release a package, push its per-package tag — the workflow packs it with pnpm
 (which rewrites `workspace:^` → a real range) and publishes the tarball with OIDC +
 provenance:

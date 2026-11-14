@@ -40,6 +40,20 @@ npm package only installs the recipe; `install` performs Designer provisioning.
 The package includes the public MSI/font helpers and licensed fonts, so it
 does not need this monorepo alongside it.
 
+### Updating
+
+To move to a new qsys-linux release, run `install` again with the same QSC ZIP:
+
+```sh
+npx qsys-linux@latest install "/path/to/Q-SYS_Designer_Installer_10.5.1.zip"
+```
+
+The menu entry and `~/.local/bin/qsys-linux` run the copy of qsys-linux that
+`install` placed in the installation, so they keep the old version until you
+do this. `npx qsys-linux@latest launch` uses the new version at once. Running
+`install` again keeps your Windows files, settings and UI scale. Close every
+open design first; `install` refuses while Designer is running.
+
 You can also open **Q-SYS Designer** from your desktop's application menu.
 The desktop launcher supports opening a design file; it does not change
 existing `.qsys` file associations.
