@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.2] - 2026-11-13
+
+### Fixed
+
+- Designer's window keeps its size on screen when you change the UI scale. Designer saves its window
+  size and position in units that the scale multiplies, so after `scale 200` a saved window opened at
+  twice the size, and after `scale 100` at half. `scale`, and `install --scale` over an existing
+  installation, now convert the saved window to the new scale.
+- Designer no longer opens fullscreen over the desktop's top bar. A window saved at the screen's size
+  or larger reopened fullscreen under Wine, then saved that size again, so every later launch did the
+  same. Before the first design opens, `launch` now changes such a saved window to open maximized. A
+  window that fits the screen, or one already saved maximized, is left as it is. With several monitors
+  only a window larger than all of them together is caught.
+
 ## [0.1.1] - 2026-11-12
 
 ### Fixed
